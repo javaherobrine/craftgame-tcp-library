@@ -7,7 +7,7 @@ import io.github.javaherobrine.net.event.*;
 import io.github.javaherobrine.*;
 import io.github.javaherobrine.net.sync.*;
 import io.github.javaherobrine.ioStream.*;
-public class Client implements Closeable{
+public abstract class Client implements Closeable{
 	Socket soc;
 	InputStream is;
 	OutputStream os;
@@ -28,41 +28,42 @@ public class Client implements Closeable{
 		this.is=soc.getInputStream();
 		this.os=soc.getOutputStream();
 	}
-	public void shakeHands() throws IOException {
-		TransmissionFormat[] allFormats=TransmissionFormat.values();
-		for(int i=0;i<allFormats.length;i++) {
-			os.write((allFormats[i].toString()+"\n").getBytes("UTF-8"));
-			os.flush();
-			int code=IOUtils.byte4ToInt(is.readNBytes(4), 0);
-			if(code==0) {
-				os.write((ModLoader.loader.toString()+"\n").getBytes("UTF-8"));
-				code=IOUtils.byte4ToInt(is.readNBytes(4), 0);
-				if(code==1) {
-					msg.connected=true;
-					msg.format=allFormats[i];
-					msg.status=TransmissionStatus.ACCEPTED;
-					msg.id=IOUtils.byte4ToInt(is.readNBytes(4), 0);
-					msg.mods=ModLoader.loader.toString().split(",");
-					/*if(msg.format==TransmissionFormat.OBJECT) {
-						out=new ObjectOutputStream(os);
-						in=new ObjectInputStream(is);
-					}else*/ if(msg.format==TransmissionFormat.JSON){
-						out=new JSONOutputStream(os);
-						in=new JSONInputStream(is);
-					}
-					return;
-				}else if(code==-1) {
-					break;
-				}
-			}else if(code==-10) {
-				break;
-			}
-		}
-		msg.connected=false;
-		msg.format=TransmissionFormat.FINISH;
-		msg.status=TransmissionStatus.CONTINUE;
-		msg.id=-1;
-	}
+	public abstract void shakeHands() throws IOException;
+//	public void shakeHands() throws IOException {
+//		TransmissionFormat[] allFormats=TransmissionFormat.values();
+//		for(int i=0;i<allFormats.length;i++) {
+//			os.write((allFormats[i].toString()+"\n").getBytes("UTF-8"));
+//			os.flush();
+//			int code=IOUtils.byte4ToInt(is.readNBytes(4), 0);
+//			if(code==0) {
+//				os.write((ModLoader.loader.toString()+"\n").getBytes("UTF-8"));
+//				code=IOUtils.byte4ToInt(is.readNBytes(4), 0);
+//				if(code==1) {
+//					msg.connected=true;
+//					msg.format=allFormats[i];
+//					msg.status=TransmissionStatus.ACCEPTED;
+//					msg.id=IOUtils.byte4ToInt(is.readNBytes(4), 0);
+//					msg.mods=ModLoader.loader.toString().split(",");
+//					/*if(msg.format==TransmissionFormat.OBJECT) {
+//						out=new ObjectOutputStream(os);
+//						in=new ObjectInputStream(is);
+//					}else*/ if(msg.format==TransmissionFormat.JSON){
+//						out=new JSONOutputStream(os);
+//						in=new JSONInputStream(is);
+//					}
+//					return;
+//				}else if(code==-1) {
+//					break;
+//				}
+//			}else if(code==-10) {
+//				break;
+//			}
+//		}
+//		msg.connected=false;
+//		msg.format=TransmissionFormat.FINISH;
+//		msg.status=TransmissionStatus.CONTINUE;
+//		msg.id=-1;
+//	}
 	@Override
 	public void close() throws IOException {
 		soc.close();
@@ -71,12 +72,6 @@ public class Client implements Closeable{
 		event.index=msg.id;
 		event.sendExec();
 		out.writeObject(event);
-	}
-	public static Client reconnectToServer(String host,int port) throws IOException{
-		Client c=new Client(new Socket(host,port));
-		BufferedWriter bw=new BufferedWriter(new OutputStreamWriter(c.os,"UTF-8"));
-		bw.write(TransmissionFormat.RECONNECT.toString());
-		return c;
 	}
 	public EventContent receiveEvent() throws IOException {
 		try {
