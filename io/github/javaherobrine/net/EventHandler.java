@@ -2,14 +2,12 @@ package io.github.javaherobrine.net;
 import java.util.concurrent.*;
 public class EventHandler extends Thread{
 	private BlockingQueue<EventContent> q=new LinkedBlockingQueue<>();
-	static EventHandler handler;
 	boolean disconnected;
-	boolean serverside;
 	@Override
 	public void run() {
 		while(!disconnected) {
 			try {
-				q.take().recvExec(serverside);
+				q.take().recvExec(true);
 			} catch (InterruptedException e) {
 				break;
 			} catch (Exception e) {

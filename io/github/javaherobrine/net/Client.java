@@ -2,20 +2,17 @@ package io.github.javaherobrine.net;
 import java.net.*;
 import java.io.*;
 public class Client extends Thread implements Closeable{
-	private Socket client;
-	private ObjectInputStream in;
-	private ObjectOutputStream out;
-	private boolean disconnected=false;
+	Socket client;
+	protected ObjectInputStream in;
+	protected ObjectOutputStream out;
+	protected boolean disconnected=false;
 	public Client(String host,int port) throws IOException {
 		client=new Socket(host,port);
 		in=new ObjectInputStream(client.getInputStream());
 		out=new ObjectOutputStream(client.getOutputStream());
-		EventHandler.handler=new EventHandler();
-		EventHandler.handler.serverside=false;
-		EventHandler.handler.start();
 		//TODO check
 	}
-	protected Client(Socket ac) throws IOException {//used in server
+	Client(Socket ac) throws IOException {//used in server
 		client=ac;
 		in=new ObjectInputStream(client.getInputStream());
 		out=new ObjectOutputStream(client.getOutputStream());
@@ -24,18 +21,31 @@ public class Client extends Thread implements Closeable{
 	public void run() {
 		while(!disconnected) {
 			try {
-				EventHandler.handler.push((EventContent)in.readObject());
+				((EventContent)in.readObject()).recvExec(false);
 			} catch (ClassNotFoundException e) {
 				//that is to say,the extensions are different
 				//TODO show an error and then close the connection
 			} catch (IOException e) {
 				//that is to say,the connection is broken
 				//TODO show a message that the connection is broken
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 	}
 	public void send(EventContent c) throws IOException {
 		out.writeObject(c);
+	}
+	protected EventContent recv() throws IOException{
+		try {
+			EventContent r=(EventContent) in.readObject();
+			r.recver=this;
+			return r;
+		} catch (ClassNotFoundException e) {
+			//TODO process
+		}
+		return null;
 	}
 	@Override
 	public void close() throws IOException {
