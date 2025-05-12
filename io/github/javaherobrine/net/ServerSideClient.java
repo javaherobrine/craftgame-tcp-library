@@ -6,7 +6,6 @@ public class ServerSideClient extends Client {
 	private EventHandler handle;
 	protected ServerSideClient(Socket ac,Server serv,EventHandler handler) throws IOException {
 		super(ac);
-		// TODO Auto-generated constructor stub
 		handle=handler;
 		server=serv;
 	}
