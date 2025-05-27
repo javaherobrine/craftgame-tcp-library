@@ -17,7 +17,7 @@ public class TLSUtils {
 		KeyManagerFactory km=KeyManagerFactory.getInstance(encrypt);
 		km.init(keystore,pwd);
 		TrustManagerFactory tmf=TrustManagerFactory.getInstance(encrypt);
-		tmf.init((KeyStore)null);
+		tmf.init(keystore);
 		context.init(km.getKeyManagers(),tmf.getTrustManagers(),null);
 		return context;
 	}
