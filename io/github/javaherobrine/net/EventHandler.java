@@ -1,8 +1,9 @@
 package io.github.javaherobrine.net;
 import java.util.concurrent.*;
-public class EventHandler extends Thread{
+import java.io.*;
+public class EventHandler extends Thread implements Closeable{
 	private BlockingQueue<EventContent> q=new LinkedBlockingQueue<>();
-	boolean disconnected;
+	private boolean disconnected;
 	@Override
 	public void run() {
 		while(!disconnected) {
@@ -15,11 +16,18 @@ public class EventHandler extends Thread{
 			}
 		}
 	}
-	public void push(EventContent c) {
-		try {
-			q.put(c);
-		} catch (InterruptedException e) {
-			//it shouldn't happen
+	public void push(EventContent c) throws InterruptedException{
+		if(c==null) {
+			return;
 		}
+		if(disconnected) {
+			throw new IllegalStateException("");
+		}
+		q.put(c);
+	}
+	@Override
+	public void close() {
+		disconnected=true;
+		interrupt();
 	}
 }
