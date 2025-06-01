@@ -1,7 +1,5 @@
 package io.github.javaherobrine.net;
 import java.io.*;
-import io.github.javaherobrine.modloader.*;
-import io.github.javaherobrine.*;
 import java.net.*;
 import java.util.*;
 import io.github.javaherobrine.ioStream.*;
