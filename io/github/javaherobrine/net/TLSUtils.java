@@ -21,4 +21,20 @@ public class TLSUtils {
 		context.init(km.getKeyManagers(),tmf.getTrustManagers(),null);
 		return context;
 	}
+	@Deprecated
+	public static SSLContext trustAllCert() throws KeyManagementException, NoSuchAlgorithmException {//man in middle is a problem
+		SSLContext ssl=SSLContext.getInstance("SSL");
+		ssl.init(null,new TrustManager[] {new X509TrustManager() {
+				@Override
+				public void checkClientTrusted(X509Certificate[] c,String s) {}
+				@Override
+				public void checkServerTrusted(X509Certificate[] c,String s) {}
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+			}
+		},new SecureRandom());
+		return ssl;
+	}
 }
