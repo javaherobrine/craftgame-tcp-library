@@ -1,5 +1,4 @@
 package io.github.javaherobrine;
-
 import java.io.*;
 public class TrieNode {
 	private TrieNode[] linkto=new TrieNode[256];
@@ -32,6 +31,9 @@ public class TrieNode {
 		TrieNode node=this;
 		Object res=null;
 		int ch=in.read();
+		if(ch<0) {
+			ch+=256;
+		}
 		while(ch!=split) {
 			node=node.linkto[ch];
 			if(node==null) {
