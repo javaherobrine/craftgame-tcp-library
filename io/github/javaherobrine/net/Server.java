@@ -2,7 +2,7 @@ package io.github.javaherobrine.net;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-public class Server extends Thread implements Closeable{
+public abstract class Server extends Thread implements Closeable{
 	private ServerSocket server;
 	private Map<String,ServerSideClient> connected=new HashMap<String,ServerSideClient>();
 	EventHandler handler=new EventHandler();
@@ -15,9 +15,9 @@ public class Server extends Thread implements Closeable{
 			return connected.remove(name);
 		}
 	}
-	@SuppressWarnings("resource")
+	public abstract ServerSideClient accept(Socket socket);
 	public void accept() throws IOException {
-		ServerSideClient c=new ServerSideClient(server.accept(),this,handler);
+		ServerSideClient c=accept(server.accept());
 		if(c.protocol instanceof Protocol.NullProtocol) {
 			c.close();//bad protocol
 			return;
@@ -41,7 +41,7 @@ public class Server extends Thread implements Closeable{
 		synchronized(connected) {
 			connected.values().forEach(n->{
 				try {
-					//TODO Close Connectons
+					n.close();
 				} catch (Exception e) {}
 			});
 			connected.clear();

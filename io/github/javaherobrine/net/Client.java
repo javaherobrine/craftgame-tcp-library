@@ -1,56 +1,41 @@
 package io.github.javaherobrine.net;
 import java.net.*;
-import io.github.javaherobrine.*;
 import java.io.*;
-public class Client extends Thread implements Closeable{
+public abstract class Client extends Thread implements Closeable{
 	protected Socket client;
 	protected Protocol protocol;
 	protected boolean disconnected=false;
-	@SuppressWarnings("resource")
 	public Client(String host,int port) throws IOException {
-		client=new Socket(host,port);
-		//switch protocol
-		boolean unaccepted=true;
-		while(unaccepted) {
-			Protocol p=(Protocol) TrieNode.REGISTRY.access(client.getInputStream(),'\n');
-			if(p!=null) {
-				client.getOutputStream().write(1);
-				protocol=p;
-				break;
-			}
-			client.getOutputStream().write(0);
-		}
-		if(protocol instanceof Protocol.NullProtocol) {
-			throw new SocketException("Protocol not supported");
-		}
-		//TODO handshake
-		start();
+		this(new Socket(host,port));
 	}
 	protected Client(Socket ac) throws IOException {//used in server
 		client=ac;
+		protocol=protocol();
+		if(protocol instanceof Protocol.NullProtocol) {
+			throw new SocketException("Protocol not supported");
+		}
+		handshake();
+		start();
 	}
 	@Override
 	public void run() {
-		while(!disconnected) {
+		while(protocol.hasNext()) {
+			EventContent ec=recv();
+			if(ec==null) {
+			    break;
+			}
+			ec.recver=this;
 			try {
-				EventContent ec=recv();
-				ec.recver=this;
-				try {
-					ec.recvExec(false);
-				}catch(Exception e) {
-					e.printStackTrace();
-				}
-			} catch (IOException e) {
-				//that is to say,the connection is broken
-				//TODO show a message that the connection is broken
-				break;
-			} 
+				ec.recvExec(false);
+			}catch(Exception e) {
+				e.printStackTrace();
+			}
 		}
 	}
 	public void send(EventContent c) throws IOException {
 		protocol.send(c);
 	}
-	protected EventContent recv() throws IOException{
+	protected EventContent recv() {
 		return protocol.next();
 	}
 	@Override
@@ -58,4 +43,6 @@ public class Client extends Thread implements Closeable{
 		disconnected=true;
 		client.close();
 	}
+	public abstract Protocol protocol() throws IOException;
+	public abstract void handshake() throws IOException;
 }

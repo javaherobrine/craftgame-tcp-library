@@ -2,13 +2,7 @@ package io.github.javaherobrine.net;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import io.github.javaherobrine.*;
 public abstract class Protocol implements Iterator<EventContent>,Cloneable {
-	public static final LinkedList<Class<?>> SUPPORTED_PROTOCOLS=new LinkedList<>();
-	static {
-		TrieNode.REGISTRY.put(Protocol.class.getName(), new NullProtocol());
-		SUPPORTED_PROTOCOLS.addFirst(Protocol.class);
-	}
 	protected Throwable exception=null;
 	protected InputStream in;
 	protected OutputStream out;
@@ -32,6 +26,10 @@ public abstract class Protocol implements Iterator<EventContent>,Cloneable {
 	}
 	//define a invalid protocol, to indicate protocol not supported
 	static class NullProtocol extends Protocol{
+	    	@Override
+	   public boolean hasNext() {
+	    	    return false;
+	   }
 		@Override
 		public EventContent next() {
 			return null;
