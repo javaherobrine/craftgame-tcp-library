@@ -4,7 +4,7 @@ import java.io.*;
 public abstract class ServerSideClient extends Client{
 	private EventHandler handler;
 	public String player;
-	private Server s;
+	public Server s;
 	protected ServerSideClient(Socket sc,Server server,EventHandler handle) throws IOException {
 		super(sc);
 		s=server;

@@ -11,6 +11,7 @@ public abstract class Client extends Thread implements Closeable{
 	protected Client(Socket ac) throws IOException {//used in server
 		client=ac;
 		protocol=protocol();
+		protocol.setSocket(client);
 		if(protocol instanceof Protocol.NullProtocol) {
 			throw new SocketException("Protocol not supported");
 		}
