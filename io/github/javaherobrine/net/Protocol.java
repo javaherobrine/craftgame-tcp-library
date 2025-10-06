@@ -18,8 +18,6 @@ public abstract class Protocol implements Iterator<EventContent>,Cloneable {
 	public Throwable getException() {
 		return exception;
 	}
-	@Override
-	public abstract Protocol clone();
 	public void setSocket(Socket soc) throws IOException {
 		in=soc.getInputStream();
 		out=soc.getOutputStream();

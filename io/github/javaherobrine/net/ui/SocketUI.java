@@ -87,7 +87,7 @@ public class SocketUI extends JFrame implements Runnable{
 		add(panel,BorderLayout.CENTER);
 		add(send,BorderLayout.SOUTH);
 		setSize(600,600);
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		setVisible(true);
 	}
 }
