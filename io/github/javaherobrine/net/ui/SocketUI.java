@@ -40,7 +40,7 @@ public class SocketUI extends JFrame implements Runnable{
 	public SocketUI(Socket soc) {
 		socket=soc;
 		JMenuBar bar=new JMenuBar();
-		JMenu file=new JMenu("File");
+		JMenu file=new JMenu("Network");
 		JMenuItem upload=new JMenuItem("Upload");
 		upload.addActionListener(m->{
 			if(CHOOSER.showDialog(null, "Upload")==0) {
