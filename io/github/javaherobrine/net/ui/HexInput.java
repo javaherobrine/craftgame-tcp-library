@@ -10,7 +10,8 @@ public class HexInput extends JFrame{
 	@SuppressWarnings("unused")
 	private HexInput() {
 		SwingUtilities.invokeLater(()->{
-			JFormattedTextField field=new JFormattedTextField();
+			setTitle("I");
+			JTextField field=new JTextField();
 			AbstractDocument doc=(AbstractDocument)field.getDocument();
 			doc.setDocumentFilter(new DocumentFilter() {
 				@Override
@@ -18,28 +19,20 @@ public class HexInput extends JFrame{
 					StringBuilder sb=new StringBuilder();
 					for(int i=0;i<str.length();++i) {
 						char ch=str.charAt(i);
-						System.err.println(ch);
-						System.err.println((int)ch);
 						if(Character.isDigit(ch)) {
-							System.err.println("digit");
 							sb.append(ch);
 						}
 						if(ch>='a'&&ch<='f') {
-							System.err.println("Hex");
 							sb.append(ch);
 						}
 						if(ch>='A'&&ch<='F') {
-							System.err.println("Hex");
 							sb.append(ch);
 						}
 					}
-					System.err.println(sb.length()+" "+length);
 					super.replace(fb, offset, sb.length()-1, sb.toString(), aset);
 				}
 				@Override
 				public void insertString(DocumentFilter.FilterBypass fp, int offset,String string,AttributeSet aset) throws BadLocationException {
-					System.err.println("+");
-					System.err.println(string);
 					StringBuilder sb=new StringBuilder();
 					for(int i=0;i<string.length();++i) {
 						char ch=string.charAt(i);
@@ -66,15 +59,18 @@ public class HexInput extends JFrame{
 			OK.addActionListener(action->{
 				String str=field.getText();
 				if((str.length()&1)==1) {
-					
+					JOptionPane.showMessageDialog(this, "The length of hex string must be an even", "Invalid Input", JOptionPane.ERROR_MESSAGE);
+					return;
 				}
-				callback.accept(str);
-				field.setText("");
 				setVisible(false);
+				field.setText("");
+				dispose();
+				callback.accept(str);
 			});
 			cancel.addActionListener(action->{
 				field.setText("");
 				setVisible(false);
+				dispose();
 			});
 			addWindowListener(new WindowListener() {
 				@Override
@@ -83,6 +79,7 @@ public class HexInput extends JFrame{
 				public void windowClosing(WindowEvent e) {
 					field.setText("");
 					setVisible(false);
+					dispose();
 				}
 				@Override
 				public void windowClosed(WindowEvent e) {}
@@ -101,7 +98,10 @@ public class HexInput extends JFrame{
 		});
 	}
 	public static void input(Consumer<String> input) {
-		INSTANCE.callback=input;
-		INSTANCE.setVisible(true);
+		SwingUtilities.invokeLater(()->{
+			INSTANCE.pack();
+			INSTANCE.callback=input;
+			INSTANCE.setVisible(true);
+		});
 	}
 }

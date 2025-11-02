@@ -1,7 +1,10 @@
 package io.github.javaherobrine.net;
 import java.net.*;
 import java.io.*;
-public abstract class Client extends Thread implements Closeable{
+/**
+ * The TCP client, with handshake and protocol switching
+ */
+public abstract class Client extends AbstractClient{
 	protected Socket client;
 	protected Protocol protocol;
 	protected boolean disconnected=false;
