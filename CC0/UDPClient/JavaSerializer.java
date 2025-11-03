@@ -2,7 +2,7 @@ package CC0.UDPClient;
 
 
 import io.github.javaherobrine.net.EventContent;
-import io.github.javaherobrine.net.Serializer;
+import CC0.UDPClient.Serializer;
 
 import java.io.*;
 
