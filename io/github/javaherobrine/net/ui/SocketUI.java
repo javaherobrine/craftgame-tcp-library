@@ -6,6 +6,7 @@ import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import java.util.function.*;
 import io.github.javaherobrine.net.speed.*;
+import io.github.javaherobrine.net.*;
 public class SocketUI extends JFrame implements Runnable{
 	private static final long serialVersionUID = 1L;
 	private JTextArea show=new JTextArea();
@@ -14,6 +15,7 @@ public class SocketUI extends JFrame implements Runnable{
 	private Socket socket;
 	private LimitedOutputStream out;
 	private LimitedInputStream in;
+	private int currentValue;
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
@@ -35,6 +37,9 @@ public class SocketUI extends JFrame implements Runnable{
 	private final Consumer<Long> LIMIT_DOWN=speed->{
 		in.speed=speed;
 	};
+	private final Runnable APPEND_STRING=()->{
+		show.append(Character.toString((char)currentValue));
+	};
 	/*
 	 * Callback over, now initialize some fields
 	 */
@@ -54,11 +59,11 @@ public class SocketUI extends JFrame implements Runnable{
 	public void run() {
 		try {
 			while(true) {
-				int i=in.read();
-				if(i==-1) {
+				currentValue=in.read();
+				if(currentValue==-1) {
 					break;
 				}
-				show.append(Character.toString((char)i));
+				SwingUtilities.invokeLater(APPEND_STRING);
 			}
 			show.append("\nstream closed");
 		}catch(IOException e) {
@@ -76,6 +81,8 @@ public class SocketUI extends JFrame implements Runnable{
 			dispose();
 			return;
 		}
+		OutputWorker worker=new OutputWorker(out);
+		worker.start();
 		SwingUtilities.invokeLater(()->{
 			JMenuBar bar=new JMenuBar();
 			JMenu file=new JMenu("Network");
@@ -85,8 +92,7 @@ public class SocketUI extends JFrame implements Runnable{
 					try {
 						File f=CHOOSER.getSelectedFile();
 						InputStream in=new BufferedInputStream(new FileInputStream(f));
-						in.transferTo(socket.getOutputStream());
-						in.close();
+						worker.transfer(in);
 						show.append("\n"+f.length()+"bytes from file were sent\n");
 					}catch (Exception e) {}
 				}
@@ -97,8 +103,18 @@ public class SocketUI extends JFrame implements Runnable{
 					socket.close();
 				}catch (Exception e) {}
 			});
+			JMenuItem sendBinary=new JMenuItem("Send Binary Data");
+			sendBinary.addActionListener(n->{
+				HexInput.input(SEND_HEX);
+			});
+			JMenuItem limit=new JMenuItem("Limit Data Rate");
+			limit.addActionListener(n->{
+				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
+			});
 			file.add(upload);
 			file.add(close);
+			file.add(sendBinary);
+			file.add(limit);
 			bar.add(file);
 			setJMenuBar(bar);
 			JPanel panel=new JPanel();
@@ -114,19 +130,11 @@ public class SocketUI extends JFrame implements Runnable{
 			panel.add(scroll0,BorderLayout.CENTER);
 			panel.add(scroll1,BorderLayout.SOUTH);
 			send.addActionListener(n->{
-				try {
-					show.append(input.getText());
-					socket.getOutputStream().write(input.getText().getBytes());
-					input.setText("");
-				} catch (IOException e) {}
-			});
-			JMenuItem sendBinary=new JMenuItem("Send Binary Data");
-			sendBinary.addActionListener(n->{
-				HexInput.input(SEND_HEX);
-			});
-			JMenuItem limit=new JMenuItem("Limit Data Rate");
-			limit.addActionListener(n->{
-				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
+				input.setEditable(false);
+				worker.write(input.getText().getBytes());
+				show.append(input.getText());
+				input.setEditable(true);
+				input.setText("");
 			});
 			setLayout(new BorderLayout());
 			setTitle(soc.toString());

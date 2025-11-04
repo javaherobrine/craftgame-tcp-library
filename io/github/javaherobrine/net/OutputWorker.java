@@ -7,7 +7,7 @@ import java.io.*;
 public class OutputWorker extends Thread{
 	private OutputStream out;
 	public static final Runnable NULL_CALLBACK=()->{};
-	private LinkedBlockingQueue<OutputEvent> queue=new LinkedBlockingQueue<>();
+	private LinkedBlockingQueue<EventContent> queue=new LinkedBlockingQueue<>();
 	public OutputWorker(OutputStream out) {
 		super("I/O Thread: Write");
 		this.out=out;
@@ -18,7 +18,7 @@ public class OutputWorker extends Thread{
 				queue.take().recvExec(false);
 			} catch (InterruptedException e) {
 				return;//Thread::interrupt() is the right way to stop this thread
-			} catch (IOException e1) {
+			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
 		}
@@ -39,10 +39,33 @@ public class OutputWorker extends Thread{
 			this.out=out;
 		}
 	}
+	@SuppressWarnings("serial")
+	private static class Transfer extends EventContent{
+		private InputStream in;
+		private Runnable callback;
+		private OutputStream out;
+		@Override
+		public void recvExec(boolean serverside) throws Exception {
+			in.transferTo(out);
+			in.close();
+			callback.run();
+		}
+		Transfer(OutputStream o,InputStream i,Runnable cb){
+			in=i;
+			out=o;
+			callback=cb;
+		}
+	}
 	public void write(byte[] data,Runnable callback) {
 		queue.add(new OutputEvent(data,callback,out));
 	}
 	public void write(byte[] data) {
 		write(data,NULL_CALLBACK);
+	}
+	public void transfer(InputStream in,Runnable callback) {
+		queue.add(new Transfer(out,in,callback));
+	}
+	public void transfer(InputStream in) {
+		transfer(in,NULL_CALLBACK);
 	}
 }
