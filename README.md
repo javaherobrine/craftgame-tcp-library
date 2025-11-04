@@ -13,3 +13,5 @@ Releases are provided, but it's recommended to embed my code into your code dire
 ~[Document](https://javaherobrine.github.io/document/tcp)~ Need update(It's the legacy, the version that I deleted)
 
 If you discovered this repository in 2021, you may know what I'm saying
+
+Note: some of UDP code was not written by CraftGame Studio and maybe there will be some implementations that differ from Java_Herobrine's(in package io.gitub.javaherobrine) or LovelyZeeiam's(in package xueli) (and their subpackages).

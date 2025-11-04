@@ -9,6 +9,7 @@ public class OutputWorker extends Thread{
 	public static final Runnable NULL_CALLBACK=()->{};
 	private LinkedBlockingQueue<OutputEvent> queue=new LinkedBlockingQueue<>();
 	public OutputWorker(OutputStream out) {
+		super("I/O Thread: Write");
 		this.out=out;
 	}
 	public void run() {
@@ -22,6 +23,7 @@ public class OutputWorker extends Thread{
 			}
 		}
 	}
+	@SuppressWarnings("serial")
 	private static class OutputEvent extends EventContent{
 		private Runnable callback;
 		private byte[] data;

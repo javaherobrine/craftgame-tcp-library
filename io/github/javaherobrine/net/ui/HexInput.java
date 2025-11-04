@@ -5,6 +5,7 @@ import javax.swing.text.*;
 import java.util.function.*;
 import java.awt.event.*;
 public class HexInput extends JFrame{
+	private static final long serialVersionUID = 1L;
 	private Consumer<String> callback;
 	private static HexInput INSTANCE = new HexInput();
 	@SuppressWarnings("unused")
@@ -95,11 +96,11 @@ public class HexInput extends JFrame{
 			panel.add(OK);
 			panel.add(cancel);
 			add(panel,BorderLayout.SOUTH);
+			dispose();
 		});
 	}
 	public static void input(Consumer<String> input) {
 		SwingUtilities.invokeLater(()->{
-			INSTANCE.pack();
 			INSTANCE.callback=input;
 			INSTANCE.setVisible(true);
 		});

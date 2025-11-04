@@ -5,15 +5,20 @@ import java.net.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import java.util.function.*;
+import io.github.javaherobrine.net.speed.*;
 public class SocketUI extends JFrame implements Runnable{
+	private static final long serialVersionUID = 1L;
 	private JTextArea show=new JTextArea();
 	private TextArea input=new TextArea();
 	private static final JFileChooser CHOOSER=new JFileChooser();
 	private Socket socket;
+	private LimitedOutputStream out;
+	private LimitedInputStream in;
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
 	 * If I put this lambda expression in the parameter of callback, there will be tons of temporary objects.
+	 * They are all callbacks
 	 */
 	private final Consumer<String> SEND_HEX=str->{
 		byte[] block=new byte[str.length()>>1];
@@ -21,9 +26,18 @@ public class SocketUI extends JFrame implements Runnable{
 			block[i]=(byte)(Character.digit(str.charAt(1|(i<<1)),16)+(Character.digit(str.charAt(i<<1),16)<<4));
 		}
 		try {
-			socket.getOutputStream().write(block);
+			out.write(block);
 		} catch (IOException e) {}
 	};
+	private final Consumer<Long> LIMIT_UP=speed->{
+		out.speed=speed;
+	};
+	private final Consumer<Long> LIMIT_DOWN=speed->{
+		in.speed=speed;
+	};
+	/*
+	 * Callback over, now initialize some fields
+	 */
 	static {
 		CHOOSER.setFileFilter(new FileFilter(){
 			@Override
@@ -39,7 +53,6 @@ public class SocketUI extends JFrame implements Runnable{
 	@Override
 	public void run() {
 		try {
-			Reader in=new InputStreamReader(socket.getInputStream(),"UTF-8");
 			while(true) {
 				int i=in.read();
 				if(i==-1) {
@@ -52,8 +65,17 @@ public class SocketUI extends JFrame implements Runnable{
 			show.append("\nstream closed");
 		}
 	}
+	@SuppressWarnings("unused")
 	public SocketUI(Socket soc) {
 		socket=soc;
+		try {
+			in=new LimitedInputStream(soc.getInputStream());
+			out=new LimitedOutputStream(soc.getOutputStream());
+		} catch (IOException e) {
+			System.err.println("Invalid socket");
+			dispose();
+			return;
+		}
 		SwingUtilities.invokeLater(()->{
 			JMenuBar bar=new JMenuBar();
 			JMenu file=new JMenu("Network");
@@ -101,6 +123,10 @@ public class SocketUI extends JFrame implements Runnable{
 			JMenuItem sendBinary=new JMenuItem("Send Binary Data");
 			sendBinary.addActionListener(n->{
 				HexInput.input(SEND_HEX);
+			});
+			JMenuItem limit=new JMenuItem("Limit Data Rate");
+			limit.addActionListener(n->{
+				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
 			});
 			setLayout(new BorderLayout());
 			setTitle(soc.toString());

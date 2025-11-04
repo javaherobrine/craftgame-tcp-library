@@ -4,7 +4,7 @@ import java.io.*;
  * Used to limit the upload speed
  */
 public class LimitedOutputStream extends FilterOutputStream {
-	public long speed;//bytes per second, 0 for no limitation
+	public long speed=0;//bytes per second, 0 for no limitation
 	public static final long FACTOR1=1000;
 	public static final long FACTOR2=1000000;
 	public LimitedOutputStream(OutputStream out) {
