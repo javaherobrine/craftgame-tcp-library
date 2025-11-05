@@ -11,7 +11,7 @@ public class HexInput extends JFrame{
 	@SuppressWarnings("unused")
 	private HexInput() {
 		SwingUtilities.invokeLater(()->{
-			setTitle("I");
+			setTitle("Hex input");
 			JTextField field=new JTextField();
 			AbstractDocument doc=(AbstractDocument)field.getDocument();
 			doc.setDocumentFilter(new DocumentFilter() {
@@ -50,13 +50,13 @@ public class HexInput extends JFrame{
 					super.insertString(fp, offset, sb.toString(), aset);
 				}
 			});
-			setSize(200,100);
 			setLayout(new BorderLayout());
-			add(field,BorderLayout.NORTH);
+			add(new JLabel("Input Binary Data via Hex"),BorderLayout.NORTH);
+			add(field,BorderLayout.CENTER);
 			JPanel panel=new JPanel();
 			panel.setLayout(new FlowLayout());
 			JButton OK=new JButton("OK");
-			JButton cancel=new JButton("cancel");
+			JButton cancel=new JButton("Cancel");
 			OK.addActionListener(action->{
 				String str=field.getText();
 				if((str.length()&1)==1) {
@@ -96,11 +96,12 @@ public class HexInput extends JFrame{
 			panel.add(OK);
 			panel.add(cancel);
 			add(panel,BorderLayout.SOUTH);
-			dispose();
+			pack();
 		});
 	}
 	public static void input(Consumer<String> input) {
 		SwingUtilities.invokeLater(()->{
+			INSTANCE.pack();
 			INSTANCE.callback=input;
 			INSTANCE.setVisible(true);
 		});

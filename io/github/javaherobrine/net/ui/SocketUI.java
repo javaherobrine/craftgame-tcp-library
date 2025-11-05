@@ -1,6 +1,8 @@
 package io.github.javaherobrine.net.ui;
 import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -10,12 +12,13 @@ import io.github.javaherobrine.net.*;
 public class SocketUI extends JFrame implements Runnable{
 	private static final long serialVersionUID = 1L;
 	private JTextArea show=new JTextArea();
-	private TextArea input=new TextArea();
+	private JTextArea input=new JTextArea();
 	private static final JFileChooser CHOOSER=new JFileChooser();
 	private Socket socket;
 	private LimitedOutputStream out;
 	private LimitedInputStream in;
 	private int currentValue;
+	private OutputWorker worker;
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
@@ -56,17 +59,25 @@ public class SocketUI extends JFrame implements Runnable{
 		});
 	}
 	@Override
-	public void run() {
+	public void run() {//Don't invoke interrupt
 		try {
 			while(true) {
 				currentValue=in.read();
 				if(currentValue==-1) {
 					break;
 				}
-				SwingUtilities.invokeLater(APPEND_STRING);
+				try {
+					SwingUtilities.invokeAndWait(APPEND_STRING);
+				} catch (InvocationTargetException e) {
+					e.printStackTrace();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
+			worker.interrupt();
 			show.append("\nstream closed");
 		}catch(IOException e) {
+			worker.interrupt();
 			show.append("\nstream closed");
 		}
 	}
@@ -81,9 +92,10 @@ public class SocketUI extends JFrame implements Runnable{
 			dispose();
 			return;
 		}
-		OutputWorker worker=new OutputWorker(out);
+		worker=new OutputWorker(out);
 		worker.start();
 		SwingUtilities.invokeLater(()->{
+			input.setRows(4);
 			JMenuBar bar=new JMenuBar();
 			JMenu file=new JMenu("Network");
 			JMenuItem upload=new JMenuItem("Upload");
@@ -141,7 +153,28 @@ public class SocketUI extends JFrame implements Runnable{
 			add(panel,BorderLayout.CENTER);
 			add(send,BorderLayout.SOUTH);
 			setSize(600,600);
-			setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+			addWindowListener(new WindowListener() {
+				@Override
+				public void windowOpened(WindowEvent e) {}
+				@Override
+				public void windowClosing(WindowEvent e) {
+					try {
+						socket.close();
+					} catch (IOException e1) {}
+					dispose();
+					worker.interrupt();
+				}
+				@Override
+				public void windowClosed(WindowEvent e) {}
+				@Override
+				public void windowIconified(WindowEvent e) {}
+				@Override
+				public void windowDeiconified(WindowEvent e) {}
+				@Override
+				public void windowActivated(WindowEvent e) {}
+				@Override
+				public void windowDeactivated(WindowEvent e) {}
+			});
 			setVisible(true);
 		});
 	}

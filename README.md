@@ -10,8 +10,12 @@ Releases are provided, but it's recommended to embed my code into your code dire
 
 `new Thread(new SocketUI(new Socket(host.port))).start();` works.
 
+If you don't want to use this debugger, you can delete package `io.github.javaherobrine.net.ui` directly.
+
+If you don't want to simulate bad situations, you can delete package `io.github.javaherobrine.net.speed` directly, but the debugger relies on this package.
+
 ~[Document](https://javaherobrine.github.io/document/tcp)~ Need update(It's the legacy, the version that I deleted)
 
 If you discovered this repository in 2021, you may know what I'm saying
 
-Note: some of UDP code was not written by CraftGame Studio and maybe there will be some implementations that differ from Java_Herobrine's(in package io.gitub.javaherobrine) or LovelyZeeiam's(in package xueli) (and their subpackages).
+Note: some of UDP code was not written by CraftGame Studio and maybe there will be some implementations that differ from Java_Herobrine's(in package io.gitub.javaherobrine) or LovelyZeeiam's(in package xueli) (and their subpackages), and it is CC0 licensed instead of MIT.
