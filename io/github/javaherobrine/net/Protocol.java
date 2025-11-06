@@ -25,6 +25,14 @@ public abstract class Protocol extends AbstractProtocol{
 		in = soc.getInputStream();
 		out = soc.getOutputStream();
 	}
+	@Override
+	public Protocol clone() {
+		try {
+			return (Protocol) super.clone();
+		} catch (CloneNotSupportedException e) {
+			return null;
+		}
+	}
 	// define a invalid protocol, to indicate protocol not supported
 	static class NullProtocol extends Protocol {
 		@Override

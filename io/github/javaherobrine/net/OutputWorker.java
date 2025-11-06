@@ -1,6 +1,7 @@
 package io.github.javaherobrine.net;
 import java.util.concurrent.*;
 import java.io.*;
+import java.net.*;
 /**
  * Used for async output 
  */
@@ -56,6 +57,24 @@ public class OutputWorker extends Thread{
 			callback=cb;
 		}
 	}
+	@SuppressWarnings("serial")
+	private static class Urgent extends EventContent{
+		private Socket socket;
+		private Runnable callback;
+		private byte[] data;
+		@Override
+		public void recvExec(boolean serverside) throws Exception {
+			for(int i=0;i<data.length;++i) {
+				socket.sendUrgentData(data[i]);
+			}
+			callback.run();
+		}
+		public Urgent(Socket socket,Runnable callback,byte[] data) {
+			this.socket=socket;
+			this.callback=callback;
+			this.data=data;
+		}
+	}
 	public void write(byte[] data,Runnable callback) {
 		queue.add(new OutputEvent(data,callback,out));
 	}
@@ -67,5 +86,11 @@ public class OutputWorker extends Thread{
 	}
 	public void transfer(InputStream in) {
 		transfer(in,NULL_CALLBACK);
+	}
+	public void urgent(Socket socket,byte[] data,Runnable callback) {
+		queue.add(new Urgent(socket,callback,data));
+	}
+	public void urgent(Socket socket,byte[] data) {
+		urgent(socket,data,NULL_CALLBACK);
 	}
 }

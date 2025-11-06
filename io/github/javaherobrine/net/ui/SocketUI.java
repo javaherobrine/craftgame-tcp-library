@@ -34,6 +34,13 @@ public class SocketUI extends JFrame implements Runnable{
 			out.write(block);
 		} catch (IOException e) {}
 	};
+	private final Consumer<String> SEND_URG=str->{
+		byte[] block=new byte[str.length()>>1];
+		for(int i=0;i<block.length;++i) {
+			block[i]=(byte)(Character.digit(str.charAt(1|(i<<1)),16)+(Character.digit(str.charAt(i<<1),16)<<4));
+		}
+		worker.urgent(socket,block);
+	};
 	private final Consumer<Long> LIMIT_UP=speed->{
 		out.speed=speed;
 	};
@@ -123,11 +130,28 @@ public class SocketUI extends JFrame implements Runnable{
 			limit.addActionListener(n->{
 				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
 			});
+			JMenuItem urg=new JMenuItem("Urgent Data");
+			urg.addActionListener(n->{
+				HexInput.input(SEND_URG);
+			});
+			JMenu help=new JMenu("Help");
+			JMenuItem license=new JMenuItem("License");
+			license.addActionListener(n->{
+				try {
+					InputStream in=SocketUI.class.getResourceAsStream("/LICENSE");
+					String str=new String(in.readAllBytes());
+					in.close();
+					JOptionPane.showMessageDialog(this,str,"License",JOptionPane.INFORMATION_MESSAGE);
+				} catch (IOException e) {}
+			});
 			file.add(upload);
 			file.add(close);
 			file.add(sendBinary);
 			file.add(limit);
+			file.add(urg);
 			bar.add(file);
+			help.add(license);
+			bar.add(help);
 			setJMenuBar(bar);
 			JPanel panel=new JPanel();
 			panel.setLayout(new BorderLayout());
