@@ -11,6 +11,15 @@ public class Delimiter {
 	public Delimiter delimiter(String input) {
 		return delimiter(input.getBytes());
 	}
+	public boolean walk(int input) {
+		current=current.next[input];
+		if(current.res==null) {
+			return false;
+		}else {
+			current=tree;
+			return true;
+		}
+	}
 	public void build() {
 		tree.AC();
 		current=tree;
@@ -19,10 +28,10 @@ public class Delimiter {
 		current=current.next[input];
 		temp.write(input);
 		if(current.res==null) {
-			return true;
+			return false;
 		}else {
 			current=tree;
-			return false;
+			return true;
 		}
 	}
 	public byte[] poll() {

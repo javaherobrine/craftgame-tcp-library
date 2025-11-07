@@ -6,6 +6,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
 import java.util.function.*;
 import io.github.javaherobrine.net.speed.*;
 import io.github.javaherobrine.net.*;
@@ -19,36 +22,36 @@ public class SocketUI extends JFrame implements Runnable{
 	private LimitedInputStream in;
 	private int currentValue;
 	private OutputWorker worker;
+	private IntPredicate currentJudger=ALLOW;
+	private HexView viewHex=new HexView();
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
 	 * If I put this lambda expression in the parameter of callback, there will be tons of temporary objects.
 	 * They are all callbacks
 	 */
-	private final Consumer<String> SEND_HEX=str->{
-		byte[] block=new byte[str.length()>>1];
-		for(int i=0;i<block.length;++i) {
-			block[i]=(byte)(Character.digit(str.charAt(1|(i<<1)),16)+(Character.digit(str.charAt(i<<1),16)<<4));
-		}
+	@SuppressWarnings("unused")
+	private static final IntPredicate ALLOW=i-> false;
+	@SuppressWarnings("unused")
+	private static final IntPredicate BLOCKED=i-> true;
+	private final Consumer<byte[]> SEND_HEX=block->{
 		try {
 			out.write(block);
 		} catch (IOException e) {}
 	};
-	private final Consumer<String> SEND_URG=str->{
-		byte[] block=new byte[str.length()>>1];
-		for(int i=0;i<block.length;++i) {
-			block[i]=(byte)(Character.digit(str.charAt(1|(i<<1)),16)+(Character.digit(str.charAt(i<<1),16)<<4));
-		}
+	private final Consumer<byte[]> SEND_URG=block->{
 		worker.urgent(socket,block);
+		viewHex.insertURG(Hex.toHex(block));
 	};
-	private final Consumer<Long> LIMIT_UP=speed->{
+	private final LongConsumer LIMIT_UP=speed->{
 		out.speed=speed;
 	};
-	private final Consumer<Long> LIMIT_DOWN=speed->{
+	private final LongConsumer LIMIT_DOWN=speed->{
 		in.speed=speed;
 	};
 	private final Runnable APPEND_STRING=()->{
 		show.append(Character.toString((char)currentValue));
+		viewHex.insertRecv(Hex.toHex((byte)currentValue));
 	};
 	/*
 	 * Callback over, now initialize some fields
@@ -73,13 +76,17 @@ public class SocketUI extends JFrame implements Runnable{
 				if(currentValue==-1) {
 					break;
 				}
+				if(currentJudger.test(currentValue)) {
+					try {
+						synchronized(this) {
+							wait();
+						}
+					} catch (InterruptedException e) {}
+				}
 				try {
 					SwingUtilities.invokeAndWait(APPEND_STRING);
-				} catch (InvocationTargetException e) {
-					e.printStackTrace();
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
+				} catch (InvocationTargetException e) {}
+				catch (InterruptedException e) {}
 			}
 			worker.interrupt();
 			show.append("\nstream closed");
@@ -116,7 +123,7 @@ public class SocketUI extends JFrame implements Runnable{
 					}catch (Exception e) {}
 				}
 			});
-			JMenuItem close=new JMenuItem("Close");
+			JMenuItem close=new JMenuItem("Disconnect");
 			close.addActionListener(n->{
 				try {
 					socket.close();
@@ -144,6 +151,26 @@ public class SocketUI extends JFrame implements Runnable{
 					JOptionPane.showMessageDialog(this,str,"License",JOptionPane.INFORMATION_MESSAGE);
 				} catch (IOException e) {}
 			});
+			JMenu data=new JMenu("Data");
+			JMenu trunc=new JMenu("Block the stream");
+			JMenuItem trunc_now=new JMenuItem("Block Now");
+			JMenuItem distrunc=new JMenuItem("Resume the stream");
+			JMenuItem clear=new JMenuItem("Clear Screen");
+			JMenuItem vh=new JMenuItem("View Raw Data as Hex");
+			vh.addActionListener(n->{
+				viewHex.setVisible(true);
+			});
+			clear.addActionListener(n->{
+				show.setText("");
+			});
+			distrunc.addActionListener(n->{
+				SocketUI.this.notify();
+			});
+			trunc.add(trunc_now);
+			data.add(vh);
+			data.add(clear);
+			data.add(trunc);
+			data.add(distrunc);
 			file.add(upload);
 			file.add(close);
 			file.add(sendBinary);
@@ -151,6 +178,7 @@ public class SocketUI extends JFrame implements Runnable{
 			file.add(urg);
 			bar.add(file);
 			help.add(license);
+			bar.add(data);
 			bar.add(help);
 			setJMenuBar(bar);
 			JPanel panel=new JPanel();
@@ -166,6 +194,7 @@ public class SocketUI extends JFrame implements Runnable{
 			panel.add(scroll0,BorderLayout.CENTER);
 			panel.add(scroll1,BorderLayout.SOUTH);
 			send.addActionListener(n->{
+				viewHex.insertSend(Hex.toHex(input.getText().getBytes()));
 				input.setEditable(false);
 				worker.write(input.getText().getBytes());
 				show.append(input.getText());
@@ -189,7 +218,10 @@ public class SocketUI extends JFrame implements Runnable{
 					worker.interrupt();
 				}
 				@Override
-				public void windowClosed(WindowEvent e) {}
+				public void windowClosed(WindowEvent e) {
+					viewHex.dispose();
+					HexInput.INSTANCE.dispose();
+				}
 				@Override
 				public void windowIconified(WindowEvent e) {}
 				@Override
@@ -202,4 +234,110 @@ public class SocketUI extends JFrame implements Runnable{
 			setVisible(true);
 		});
 	}
+	/*
+	 * Only used internally 
+	 */
+	private static class SpeedInput extends JFrame{
+		private LongConsumer up;
+		private LongConsumer down;
+		private static final long serialVersionUID = 1L;
+		private static final SpeedInput INSTANCE=new SpeedInput();
+		@SuppressWarnings("unused")
+		private SpeedInput() {
+			SwingUtilities.invokeLater(()->{
+				setTitle("Speed Limiter");
+				JPanel upload=new JPanel();
+				upload.setLayout(new FlowLayout());
+				JLabel unit=new JLabel("byte(s)/s");
+				JLabel unit0=new JLabel("byte(s)/s");
+				JLabel u=new JLabel("Max Upload Speed: ");
+				JLabel d=new JLabel("Max Download Speed: ");
+				JFormattedTextField u1=new JFormattedTextField();
+				u1.setValue(0L);
+				upload.add(u);
+				upload.add(u1);
+				upload.add(unit);
+				JFormattedTextField u2=new JFormattedTextField();
+				u2.setValue(0L);
+				JPanel download=new JPanel();
+				download.add(d);
+				download.add(u2);
+				download.add(unit0);
+				setLayout(new BorderLayout());
+				add(upload,BorderLayout.NORTH);
+				add(download,BorderLayout.CENTER);
+				JLabel no=new JLabel("0 for no limitation");
+				JPanel button=new JPanel();
+				button.setLayout(new FlowLayout());
+				button.add(no);
+				JButton OK=new JButton("OK");
+				OK.addActionListener(n->{
+					up.accept((Long)u1.getValue());
+					down.accept((Long)u2.getValue());
+					dispose();
+				});
+				JButton cancel=new JButton("Cancel");
+				cancel.addActionListener(n->{
+					dispose();
+				});
+				button.add(OK);
+				button.add(cancel);
+				add(button,BorderLayout.SOUTH);
+				setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+				pack();
+			});
+		}
+		public static void limit(LongConsumer u,LongConsumer d) {
+			INSTANCE.up=u;
+			INSTANCE.down=d;
+			SwingUtilities.invokeLater(()->{
+				INSTANCE.pack();
+				INSTANCE.setVisible(true);
+			});
+		}
+	}
+	private static class HexView extends JFrame{
+		private static final long serialVersionUID = 1L;
+		private JTextPane pane;
+		private static final SimpleAttributeSet RED=new SimpleAttributeSet(),BLUE=new SimpleAttributeSet(),GREEN=new SimpleAttributeSet();
+		@SuppressWarnings("unused")
+		public HexView() {
+			StyleConstants.setForeground(GREEN, Color.green);
+			StyleConstants.setForeground(BLUE, Color.blue);
+			StyleConstants.setForeground(RED, Color.red);
+			SwingUtilities.invokeLater(()->{
+				setTitle("Red = Urgent Data, Blue = Data Received, Green = Data Sent");
+				pane=new JTextPane();
+				pane.setEditable(false);
+				setSize(500,500);
+				add(pane);
+				JMenuBar bar=new JMenuBar();
+				JMenu data=new JMenu("Data");
+				JMenuItem cls=new JMenuItem("Clear Screen");
+				setDefaultCloseOperation(HIDE_ON_CLOSE);
+				cls.addActionListener(n->{
+					pane.setText("");
+				});
+				data.add(cls);
+				bar.add(data);
+				setJMenuBar(bar);
+			});
+		}
+		public void insertSend(String str) {
+			try {
+				pane.getDocument().insertString(pane.getText().length(), str, GREEN);
+			} catch (BadLocationException e) {} 
+		}
+		public void insertRecv(String str) {
+			try {
+				pane.getDocument().insertString(pane.getText().length(), str, BLUE);
+			} catch (BadLocationException e) {}
+		}
+		public void insertURG(String str) {
+			try {
+				pane.getDocument().insertString(pane.getText().length(), str, RED);
+			} catch (BadLocationException e) {}
+		}
+	}
+
 }
