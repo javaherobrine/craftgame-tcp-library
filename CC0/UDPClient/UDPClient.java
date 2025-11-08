@@ -33,10 +33,17 @@ public abstract class UDPClient extends AbstractClient {
         }
         start();
     }
+    
+    public UDPClient(DatagramSocket socket) {
+    		this.socket=socket;
+    		this.remote=null;
+    }
 
     /**
      * 服务端在接收到数据包并识别出客户端时可使用此构造器来封装为 UDPClient 实例
+     * @deprecated This implementation is incorrect as "clients" will receive others' packets
      */
+    @Deprecated(since="v1.3.1",forRemoval=true)
     protected UDPClient(DatagramSocket socket, InetSocketAddress remote) throws SocketException {
         this.remote = remote;
         this.socket = socket;

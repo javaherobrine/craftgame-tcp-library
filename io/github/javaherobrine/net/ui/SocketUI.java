@@ -12,6 +12,7 @@ import javax.swing.text.StyleConstants;
 import java.util.function.*;
 import io.github.javaherobrine.net.speed.*;
 import io.github.javaherobrine.net.*;
+import io.github.javaherobrine.*;
 public class SocketUI extends JFrame implements Runnable{
 	private static final long serialVersionUID = 1L;
 	private JTextArea show=new JTextArea();
@@ -24,6 +25,8 @@ public class SocketUI extends JFrame implements Runnable{
 	private OutputWorker worker;
 	private IntPredicate currentJudger=ALLOW;
 	private HexView viewHex=new HexView();
+	private Delimiter delimiter;
+	private JDialog dialog=new JDialog();
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
@@ -34,6 +37,7 @@ public class SocketUI extends JFrame implements Runnable{
 	private static final IntPredicate ALLOW=i-> false;
 	@SuppressWarnings("unused")
 	private static final IntPredicate BLOCKED=i-> true;
+	private final IntPredicate AC=delimiter::walk;
 	private final Consumer<byte[]> SEND_HEX=block->{
 		try {
 			out.write(block);
@@ -339,5 +343,4 @@ public class SocketUI extends JFrame implements Runnable{
 			} catch (BadLocationException e) {}
 		}
 	}
-
 }
