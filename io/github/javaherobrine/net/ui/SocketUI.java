@@ -37,7 +37,6 @@ public class SocketUI extends JFrame implements Runnable{
 	private static final IntPredicate ALLOW=i-> false;
 	@SuppressWarnings("unused")
 	private static final IntPredicate BLOCKED=i-> true;
-	private final IntPredicate AC=delimiter::walk;
 	private final Consumer<byte[]> SEND_HEX=block->{
 		try {
 			out.write(block);

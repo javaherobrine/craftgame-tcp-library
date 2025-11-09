@@ -2,7 +2,8 @@ package io.github.javaherobrine.net;
 import java.io.*;
 import static java.util.AbstractMap.SimpleEntry;
 import java.util.Map;
-public abstract class EventContent implements Serializable,Cloneable{
+import io.github.javaherobrine.*;
+public abstract class EventContent extends AbstractEvent implements Serializable,Cloneable{
 	private static final long serialVersionUID = 1;
 	//If it takes long time,it had better be interruptible
 	public abstract void recvExec(boolean serverside) throws Exception;
@@ -19,5 +20,9 @@ public abstract class EventContent implements Serializable,Cloneable{
 	    } catch (CloneNotSupportedException e) {
 			throw new Error("panic");
 	    }
+	}
+	@Override
+	public void process() throws Exception{
+		recvExec(recver instanceof ServerSideClient);
 	}
 }

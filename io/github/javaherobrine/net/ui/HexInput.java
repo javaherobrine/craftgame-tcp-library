@@ -49,14 +49,13 @@ public class HexInput extends JFrame{
 			JPanel jp=new JPanel();
 			jp.setLayout(new FlowLayout());
 			jp.add(new JLabel("Charset="));
-			JList<Charset> list=new JList<>(Charset.availableCharsets().values().toArray(new Charset[0]));
-			list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			JComboBox<Charset> list=new JComboBox<>(Charset.availableCharsets().values().toArray(new Charset[0]));
 			jp.add(new JScrollPane(list));
 			jp.setSize(500, 50);
 			JButton ok=new JButton("OK");
 			JButton cANCEL=new JButton("Cancel");
 			ok.addActionListener(n->{
-				Charset set=list.getSelectedValue();
+				Charset set=(Charset) list.getSelectedItem();
 				field.setEditable(false);
 				String temp=Hex.toHex(area.getText().getBytes(set!=null?set:Charset.defaultCharset()));
 				try {

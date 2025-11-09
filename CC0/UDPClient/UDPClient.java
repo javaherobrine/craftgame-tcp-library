@@ -4,7 +4,6 @@ package CC0.UDPClient;
 import io.github.javaherobrine.net.AbstractClient;
 import io.github.javaherobrine.net.AbstractProtocol;
 import io.github.javaherobrine.net.EventContent;
-
 import java.io.IOException;
 import java.net.*;
 

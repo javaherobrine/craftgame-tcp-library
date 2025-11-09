@@ -1,9 +1,8 @@
 package CC0.UDPClient;
 
 
-import io.github.javaherobrine.net.EventContent;
 import CC0.UDPClient.Serializer;
-
+import io.github.javaherobrine.net.EventContent;
 import java.io.*;
 
 public class JavaSerializer implements Serializer {
