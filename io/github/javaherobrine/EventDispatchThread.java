@@ -9,11 +9,19 @@ public class EventDispatchThread extends Thread{
 				AbstractEvent event=queue.take();
 				try {
 					event.process();
-				} catch (Exception e) {
-					e.printStackTrace();
+				} catch (Throwable e) {
+					e.printStackTrace(System.out);
+					try {
+						event.exception(e);
+					} catch (Exception e1) {}
+				}
+				synchronized(event) {
+					event.notifyAll();
 				}
 			}
-		}catch(InterruptedException e) {}
+		}catch(InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 	public void put(AbstractEvent e) {
 		queue.add(e);

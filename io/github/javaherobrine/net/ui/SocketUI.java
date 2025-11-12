@@ -17,16 +17,15 @@ public class SocketUI extends JFrame implements Runnable{
 	private static final long serialVersionUID = 1L;
 	private JTextArea show=new JTextArea();
 	private JTextArea input=new JTextArea();
-	private static final JFileChooser CHOOSER=new JFileChooser();
+	static final JFileChooser CHOOSER=new JFileChooser();
 	private Socket socket;
 	private LimitedOutputStream out;
 	private LimitedInputStream in;
 	private int currentValue;
-	private OutputWorker worker;
+	private EventDispatchThread EDT;
 	private IntPredicate currentJudger=ALLOW;
 	private HexView viewHex=new HexView();
-	private Delimiter delimiter;
-	private JDialog dialog=new JDialog();
+	private OutputEvent write=new OutputEvent(null,null);
 	/*
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
@@ -43,7 +42,7 @@ public class SocketUI extends JFrame implements Runnable{
 		} catch (IOException e) {}
 	};
 	private final Consumer<byte[]> SEND_URG=block->{
-		worker.urgent(socket,block);
+		EDT.put(new UrgentDataEvent(socket,block));
 		viewHex.insertURG(Hex.toHex(block));
 	};
 	private final LongConsumer LIMIT_UP=speed->{
@@ -56,10 +55,27 @@ public class SocketUI extends JFrame implements Runnable{
 		show.append(Character.toString((char)currentValue));
 		viewHex.insertRecv(Hex.toHex((byte)currentValue));
 	};
+	private final Runnable DISPLAY_IN_SCREEN=()->{
+		try {
+			SwingUtilities.invokeAndWait(APPEND_STRING);
+		} catch (InvocationTargetException | InterruptedException e) {}
+	};
+	private final Runnable TRANSFER_TO_FILE=()->{
+		write.setData(currentValue);
+		synchronized(write) {
+			EDT.put(write);
+			try {
+				write.wait();
+			} catch (InterruptedException e) {}
+		}
+	};
+	private Runnable processor=DISPLAY_IN_SCREEN;
 	/*
 	 * Callback over, now initialize some fields
 	 */
 	static {
+		CHOOSER.setMultiSelectionEnabled(false);
+		CHOOSER.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
 		CHOOSER.setFileFilter(new FileFilter(){
 			@Override
 			public boolean accept(File f) {
@@ -86,20 +102,19 @@ public class SocketUI extends JFrame implements Runnable{
 						}
 					} catch (InterruptedException e) {}
 				}
-				try {
-					SwingUtilities.invokeAndWait(APPEND_STRING);
-				} catch (InvocationTargetException e) {}
-				catch (InterruptedException e) {}
+				processor.run();
 			}
-			worker.interrupt();
+			EDT.interrupt();
 			show.append("\nstream closed");
 		}catch(IOException e) {
-			worker.interrupt();
+			EDT.interrupt();
 			show.append("\nstream closed");
 		}
 	}
 	@SuppressWarnings("unused")
 	public SocketUI(Socket soc) {
+		EDT=new EventDispatchThread();
+		EDT.start();
 		socket=soc;
 		try {
 			in=new LimitedInputStream(soc.getInputStream());
@@ -109,19 +124,20 @@ public class SocketUI extends JFrame implements Runnable{
 			dispose();
 			return;
 		}
-		worker=new OutputWorker(out);
-		worker.start();
 		SwingUtilities.invokeLater(()->{
 			input.setRows(4);
 			JMenuBar bar=new JMenuBar();
 			JMenu file=new JMenu("Network");
 			JMenuItem upload=new JMenuItem("Upload");
 			upload.addActionListener(m->{
-				if(CHOOSER.showDialog(null, "Upload")==0) {
+				if(CHOOSER.showDialog(this, "Upload")==0) {
 					try {
 						File f=CHOOSER.getSelectedFile();
+						if(f.isDirectory()) {
+							JOptionPane.showMessageDialog(this,"Can't upload a folder, maybe you can archive it?","Illegal Input", JOptionPane.ERROR_MESSAGE);
+						}
 						InputStream in=new BufferedInputStream(new FileInputStream(f));
-						worker.transfer(in);
+						EDT.put(new InputTransferEvent(in,out));
 						show.append("\n"+f.length()+"bytes from file were sent\n");
 					}catch (Exception e) {}
 				}
@@ -144,7 +160,7 @@ public class SocketUI extends JFrame implements Runnable{
 			urg.addActionListener(n->{
 				HexInput.input(SEND_URG);
 			});
-			JMenu help=new JMenu("Help");
+			JMenu help=new JMenu("About");
 			JMenuItem license=new JMenuItem("License");
 			license.addActionListener(n->{
 				try {
@@ -154,6 +170,11 @@ public class SocketUI extends JFrame implements Runnable{
 					JOptionPane.showMessageDialog(this,str,"License",JOptionPane.INFORMATION_MESSAGE);
 				} catch (IOException e) {}
 			});
+			JMenuItem author=new JMenuItem("Authors");
+			author.addActionListener(n->{
+				JOptionPane.showMessageDialog(this, "Java_Herobrine from CraftGame Studio\nB-a-s-d-y from USTC");
+			});
+			help.add(author);
 			JMenu data=new JMenu("Data");
 			JMenu trunc=new JMenu("Block the stream");
 			JMenuItem trunc_now=new JMenuItem("Block Now");
@@ -199,7 +220,7 @@ public class SocketUI extends JFrame implements Runnable{
 			send.addActionListener(n->{
 				viewHex.insertSend(Hex.toHex(input.getText().getBytes()));
 				input.setEditable(false);
-				worker.write(input.getText().getBytes());
+				EDT.put(new OutputEvent(out,input.getText().getBytes()));
 				show.append(input.getText());
 				input.setEditable(true);
 				input.setText("");
@@ -218,12 +239,13 @@ public class SocketUI extends JFrame implements Runnable{
 						socket.close();
 					} catch (IOException e1) {}
 					dispose();
-					worker.interrupt();
+					EDT.interrupt();
 				}
 				@Override
 				public void windowClosed(WindowEvent e) {
 					viewHex.dispose();
 					HexInput.INSTANCE.dispose();
+					System.exit(0);
 				}
 				@Override
 				public void windowIconified(WindowEvent e) {}

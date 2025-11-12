@@ -1,24 +1,20 @@
 package io.github.javaherobrine.net;
 import java.net.*;
 import java.io.*;
+import io.github.javaherobrine.*;
 public abstract class ServerSideClient extends Client{
-	private EventHandler handler;
+	private EventDispatchThread EDT;
 	public String player;
 	public Server s;
-	protected ServerSideClient(Socket sc,Server server,EventHandler handle) throws IOException {
+	protected ServerSideClient(Socket sc,Server server,EventDispatchThread handle) throws IOException {
 		super(sc);
 		s=server;
-		handler=handle;
+		EDT=handle;
 	}
 	@Override
 	public void run() {
 		while(!disconnected) {
-			try {
-				handler.push(recv());
-			} catch (InterruptedException e) {//the connection was closed
-				e.printStackTrace();
-				break;
-			}
+			EDT.put(recv());
 		}
 		s.removeClient(player);
 	}

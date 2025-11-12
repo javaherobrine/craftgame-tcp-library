@@ -2,10 +2,11 @@ package io.github.javaherobrine.net;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import io.github.javaherobrine.*;
 public abstract class Server extends Thread implements Closeable{
 	private ServerSocket server;
 	private Map<String,ServerSideClient> connected=new HashMap<String,ServerSideClient>();
-	EventHandler handler=new EventHandler();
+	EventDispatchThread EDT=new EventDispatchThread();
 	public Server(int port) throws IOException {
 		server=new ServerSocket(port);
 		start();
@@ -37,7 +38,7 @@ public abstract class Server extends Thread implements Closeable{
 	@Override
 	public void close() throws IOException{
 		server.close();
-		handler.close();
+		EDT.interrupt();
 		synchronized(connected) {
 			connected.values().forEach(n->{
 				try {

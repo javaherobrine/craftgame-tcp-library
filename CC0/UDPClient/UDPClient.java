@@ -8,8 +8,8 @@ import java.io.IOException;
 import java.net.*;
 
 public abstract class UDPClient extends AbstractClient {
-    private final DatagramSocket socket;
-    private final InetSocketAddress remote;
+    private DatagramSocket socket;
+    private InetSocketAddress remote;
     protected volatile boolean disconnected = false;
     private Serializer serializer;
     protected AbstractProtocol protocol;
@@ -57,6 +57,8 @@ public abstract class UDPClient extends AbstractClient {
         start();
     }
 
+    protected UDPClient() {}
+    
     public void setSerializer(Serializer s) {
         this.serializer = s;
         // 如果已经创建了 protocol，可以用新的 serializer 替换 protocol（这里重建）
@@ -81,7 +83,7 @@ public abstract class UDPClient extends AbstractClient {
             if (!disconnected) e.printStackTrace();
         }
     }
-
+    
     @Override
     public void send(EventContent ec) throws IOException {
         protocol.send(ec);
