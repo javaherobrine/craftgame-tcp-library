@@ -5,6 +5,7 @@ public class OutputEvent extends AbstractEvent{
 	private OutputStream out;
 	private byte[] data;
 	private int offset,length;
+	public boolean close=false;
 	public OutputEvent(OutputStream out,byte[] data) {
 		this(out,data,0,data.length);
 	}
@@ -23,6 +24,9 @@ public class OutputEvent extends AbstractEvent{
 			out.write(offset);
 		}else {
 			out.write(data,offset,length);
+		}
+		if(close) {
+			out.close();
 		}
 	}
 	public void setData(byte[] data) {

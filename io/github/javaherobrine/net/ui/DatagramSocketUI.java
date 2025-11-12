@@ -18,13 +18,11 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	private JPanel display=new JPanel();
 	private JDialog choose=new JDialog(this,"Transfer to File",true);
 	private EventDispatchThread EDT=new EventDispatchThread();
-	
 	/*
 	 * They are all callbacks, too
 	 * Why is Java so Object-Oriented???
 	 * Why not use Function Pointers??? 
 	 */
-	
 	private Consumer<byte[]> SEND=b->{
 		try {
 			InetAddress IP=InetAddress.getByName(rHost.getText());
@@ -42,10 +40,9 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			JOptionPane.showMessageDialog(this, "Port must be an integer", "Illegal Input", JOptionPane.ERROR_MESSAGE);
 		}
 	};
-	
 	// Callback done
-	
 	public DatagramSocketUI(DatagramSocket socket) {
+		EDT.start();
 		this.socket=socket;
 		SwingUtilities.invokeLater(()->{
 			setSize(600,600);
@@ -55,7 +52,6 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			display.setLayout(layout);
 			input.setRows(5);
 			//Dialogs
-			
 			choose.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 			JPanel cNorth=new JPanel();
 			cNorth.setLayout(new FlowLayout());
@@ -84,8 +80,9 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				}
 				try {
 					FileOutputStream out=new FileOutputStream(f,cb.isSelected());
-					EDT.put(new OutputEvent(out,currentData));
-					out.close();
+					OutputEvent to_dispatch=new OutputEvent(out,currentData);
+					to_dispatch.close=true;
+					EDT.put(to_dispatch);
 				} catch (FileNotFoundException e) {
 					JOptionPane.showMessageDialog(this, "Permission Denied", "Invalid Input",JOptionPane.ERROR_MESSAGE);
 					return;
@@ -97,12 +94,12 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			});
 			cSouth.add(OK);
 			cSouth.add(cancel);
+			choose.add(cNorth,BorderLayout.NORTH);
 			choose.add(cSouth,BorderLayout.SOUTH);
-			
+			choose.pack();
 			//Dialog done
-			
 			JMenuBar bar=new JMenuBar();
-			setLayout(new BorderLayout());
+			setLayout(new GridBagLayout());
 			JPanel bottom=new JPanel();
 			bottom.setLayout(new FlowLayout());
 			bottom.add(new JLabel("Remote Host="));
@@ -119,9 +116,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				input.setText("");
 			});
 			bottom.add(send);
-			
 			//Process Multicast DatagramSocket
-			
 			if(socket instanceof MulticastSocket multi) {
 				try {
 					JMenu multicast=new JMenu("Multicast");
@@ -140,15 +135,27 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			}
 			//multicast done
 			setJMenuBar(bar);
-			add(bottom,BorderLayout.SOUTH);
-			add(new JScrollPane(input),BorderLayout.CENTER);
-			add(view,BorderLayout.NORTH);
+			JPanel panel=new JPanel(new BorderLayout());
+			panel.add(bottom,BorderLayout.SOUTH);
+			panel.add(new JScrollPane(input),BorderLayout.NORTH);
+			setLayout(new BorderLayout());
+			view.setViewportView(display);
+			add(panel,BorderLayout.SOUTH);
+			add(view,BorderLayout.CENTER);
 			setVisible(true);
 		});
 	}
 	@Override
 	public void run() {
-		
+		while(!socket.isClosed()) {
+			try {
+				DatagramPacket packet=new DatagramPacket(new byte[65528],65528);
+				socket.receive(packet);
+				byte[] data=new byte[packet.getLength()];
+				System.arraycopy(packet.getData(),0,data,0,packet.getLength());
+				displayData(data,packet.getSocketAddress(),socket.getLocalSocketAddress());
+			} catch (IOException e) {}
+		}
 	}
 	private void displayData(byte[] data,SocketAddress src,SocketAddress dst) {
 		JPanel outer=new JPanel();
@@ -173,14 +180,12 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			public void mouseClicked(MouseEvent e) {}
 			@Override
 			public void mousePressed(MouseEvent e) {
-				System.err.println("p");
 				if(e.isPopupTrigger()) {
 					popup.show(inner,e.getX(),e.getY());
 				}
 			}
 			@Override
 			public void mouseReleased(MouseEvent e) {
-				System.err.println("r");
 				if(e.isPopupTrigger()) {
 					popup.show(inner,e.getX(),e.getY());
 				}
@@ -193,6 +198,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			@Override
 			public void mouseExited(MouseEvent e) {}
 		};
+		popup.add(file);
 		JTextArea hex=new JTextArea(),text=new JTextArea();
 		hex.setRows(5);
 		text.setRows(5);
@@ -205,6 +211,12 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		inner.add(new JScrollPane(text));
 		inner.add(new JScrollPane(hex));
 		outer.add(inner,BorderLayout.SOUTH);
-		display.add(outer);
+		SwingUtilities.invokeLater(()->{
+			display.add(outer);
+			revalidate();
+			repaint();
+			display.revalidate();
+			display.repaint();
+		});
 	}
 }
