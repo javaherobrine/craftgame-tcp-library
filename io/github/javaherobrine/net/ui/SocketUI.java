@@ -9,33 +9,53 @@ import javax.swing.filechooser.FileFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
+import javax.swing.text.AbstractDocument;
 import java.util.function.*;
+import java.util.stream.*;
 import io.github.javaherobrine.net.speed.*;
 import io.github.javaherobrine.net.*;
 import io.github.javaherobrine.*;
 public class SocketUI extends JFrame implements Runnable{
 	private static final long serialVersionUID = 1L;
+	static final JFileChooser CHOOSER=new JFileChooser();
+	//Fields
 	private JTextArea show=new JTextArea();
 	private JTextArea input=new JTextArea();
-	static final JFileChooser CHOOSER=new JFileChooser();
+	private JMenuItem lastSelected;
 	private Socket socket;
 	private LimitedOutputStream out;
 	private LimitedInputStream in;
 	private int currentValue;
 	private EventDispatchThread EDT;
-	private IntPredicate currentJudger=ALLOW;
-	private HexView viewHex=new HexView();
-	private OutputEvent write=new OutputEvent(null,null);
+	private Blocker currentJudger=BLOCKED;
+	private Blocker lastJudger;
+	private final HexView viewHex=new HexView();
+	private final OutputEvent write=new OutputEvent(null,null);
+	private final FixedLength FL_INSTANCE=new FixedLength();
+	private final Blocker FLB=new Blocker(false,true,FL_INSTANCE);
+	private boolean nRedirect=true;//don't output to file
+	private boolean nDisplay=false;//don't display in the screen
+	private boolean confirmed=false;//whether the dialog is confirmed
+	private String TITLE;
+	private String TITLE_BLOCKED;
+	private byte[] HEX_TEMP;
+	private boolean passed;
+	private Delimiter delimiter;
 	/*
+	 * Fields done, then callbacks
 	 * It works like a function pointer.
 	 * It's ugly, but with less temporary objects.
 	 * If I put this lambda expression in the parameter of callback, there will be tons of temporary objects.
 	 * They are all callbacks
 	 */
 	@SuppressWarnings("unused")
-	private static final IntPredicate ALLOW=i-> false;
+	private static final Blocker ALLOW=new Blocker(false,false,i-> false);
 	@SuppressWarnings("unused")
-	private static final IntPredicate BLOCKED=i-> true;
+	private static final Blocker BLOCKED=new Blocker(true,false,i-> true);
+	private final Consumer<byte[]> PASS_RETURN_VALUE=block->{
+		passed=true;
+		HEX_TEMP=block;
+	};
 	private final Consumer<byte[]> SEND_HEX=block->{
 		try {
 			out.write(block);
@@ -56,11 +76,17 @@ public class SocketUI extends JFrame implements Runnable{
 		viewHex.insertRecv(Hex.toHex((byte)currentValue));
 	};
 	private final Runnable DISPLAY_IN_SCREEN=()->{
+		if(nDisplay) {
+			return;
+		}
 		try {
 			SwingUtilities.invokeAndWait(APPEND_STRING);
 		} catch (InvocationTargetException | InterruptedException e) {}
 	};
 	private final Runnable TRANSFER_TO_FILE=()->{
+		if(nRedirect) {
+			return;
+		}
 		write.setData(currentValue);
 		synchronized(write) {
 			EDT.put(write);
@@ -87,6 +113,7 @@ public class SocketUI extends JFrame implements Runnable{
 			}
 		});
 	}
+	//Threading
 	@Override
 	public void run() {//Don't invoke interrupt
 		try {
@@ -95,14 +122,14 @@ public class SocketUI extends JFrame implements Runnable{
 				if(currentValue==-1) {
 					break;
 				}
-				if(currentJudger.test(currentValue)) {
-					try {
-						synchronized(this) {
-							wait();
-						}
-					} catch (InterruptedException e) {}
+				boolean result=currentJudger.test(currentValue);
+				if(currentJudger.bP()&&result) {
+					block();
 				}
 				processor.run();
+				if(currentJudger.aP()&&result) {
+					block();
+				}
 			}
 			EDT.interrupt();
 			show.append("\nstream closed");
@@ -111,11 +138,14 @@ public class SocketUI extends JFrame implements Runnable{
 			show.append("\nstream closed");
 		}
 	}
+	//GUI
 	@SuppressWarnings("unused")
 	public SocketUI(Socket soc) {
 		EDT=new EventDispatchThread();
 		EDT.start();
 		socket=soc;
+		TITLE=socket.toString();
+		TITLE_BLOCKED="[Stream Blocked]"+TITLE;
 		try {
 			in=new LimitedInputStream(soc.getInputStream());
 			out=new LimitedOutputStream(soc.getOutputStream());
@@ -176,8 +206,155 @@ public class SocketUI extends JFrame implements Runnable{
 			});
 			help.add(author);
 			JMenu data=new JMenu("Data");
-			JMenu trunc=new JMenu("Block the stream");
-			JMenuItem trunc_now=new JMenuItem("Block Now");
+			JMenu trunc=new JMenu("Modify Blocking Policies");
+			JMenuItem trunc_now=new JMenuItem("Block on Every Byte");
+			JMenuItem nonBlock=new JMenuItem("Don't Block the Stream");
+			JMenuItem length=new JMenuItem("Block after a fixed length");
+			JMenuItem del=new JMenuItem("Block after specfic delimiters");
+			lastSelected=trunc_now;
+			lastSelected.setEnabled(false);
+			trunc_now.addActionListener(n->{
+				currentJudger=BLOCKED;
+				select(trunc_now);
+			});
+			nonBlock.addActionListener(n->{
+				currentJudger=ALLOW;
+				select(nonBlock);
+			});
+			//Dialog for length
+			JDialog len=new JDialog(this,"GNU's Not Unix~",true);
+			len.setLayout(new BorderLayout());
+			JPanel lN=new JPanel();
+			lN.setLayout(new FlowLayout());
+			lN.add(new JLabel("Length="));
+			JTextField lenTF=new JTextField();
+			((AbstractDocument)lenTF.getDocument()).setDocumentFilter(new HexInput.NumberFilter());
+			lN.add(lenTF);
+			lN.add(new JLabel("Byte(s)"));
+			len.add(lN,BorderLayout.NORTH);
+			FlowLayout fl=new FlowLayout();
+			fl.setAlignment(FlowLayout.RIGHT);
+			JPanel lS=new JPanel();
+			lS.setLayout(fl);
+			JButton Lok=new JButton("OK");
+			JButton Lcancel=new JButton("Cancel");
+			Lok.addActionListener(n->{
+				long l;
+				try {
+					l=Long.parseLong(lenTF.getText());
+				} catch (NumberFormatException e) {
+					JOptionPane.showMessageDialog(this, "Length Limit Exceeded","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				if(l==0) {
+					JOptionPane.showMessageDialog(this, "Length = 0 byte?","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				FL_INSTANCE.setLength(l);
+				FL_INSTANCE.clear();
+				confirmed=true;
+				len.dispose();
+			});
+			Lcancel.addActionListener(n->{
+				confirmed=false;
+				len.dispose();
+			});
+			lS.add(Lok);
+			lS.add(Lcancel);
+			len.add(lS,BorderLayout.SOUTH);
+			len.pack();
+			len.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+			//Dialog done
+			length.addActionListener(n->{
+				preBlock();
+				len.setVisible(true);
+				if(confirmed) {
+					synchronized(SocketUI.this) {
+						currentJudger=FLB;
+						SocketUI.this.notifyAll();
+					}
+					select(length);
+				}else {
+					synchronized(SocketUI.this) {
+						SocketUI.this.notifyAll();
+					}
+				}
+			});
+			//Delimiter Dialogs
+			JDialog dDialog=new JDialog(this,"",true);
+			dDialog.setSize(600,600);
+			JPanel dS=new JPanel();
+			FlowLayout dFL=new FlowLayout();
+			dFL.setAlignment(FlowLayout.RIGHT);
+			dS.setLayout(dFL);
+			JButton dAdd=new JButton("New Delimiter");
+			JPanel dM=new JPanel();
+			BoxLayout dBL=new BoxLayout(dM,BoxLayout.Y_AXIS);
+			dM.setLayout(dBL);
+			JButton dOK=new JButton("OK");
+			JButton dCancel=new JButton("Cancel");
+			dAdd.addActionListener(n->{
+				passed=false;
+				HexInput.input(PASS_RETURN_VALUE);
+				if(passed) {
+					JPanel inner=new JPanel();
+					FlowLayout infl=new FlowLayout();
+					infl.setAlignment(FlowLayout.RIGHT);
+					inner.setLayout(infl);
+					JTextField itf=new JTextField(Hex.toHex(HEX_TEMP));
+					itf.setEditable(false);
+					JButton delete=new JButton("Delete");
+					delete.addActionListener(n0->{
+						dM.remove(inner);
+						dDialog.revalidate();
+						dDialog.repaint();
+					});
+					inner.add(new JScrollPane(itf));
+					inner.add(delete);
+					dM.add(inner);
+					dM.revalidate();
+					dM.repaint();
+					dDialog.revalidate();
+					dDialog.repaint();
+				}
+			});
+			dOK.addActionListener(n->{
+				Component components[]=dM.getComponents();
+				for(int i=0;i<components.length;++i) {
+					JPanel current=(JPanel)components[i];
+					JScrollPane pane=(JScrollPane)current.getComponent(0);
+					JTextField content=(JTextField)pane.getComponent(0);
+					delimiter.delimiter(Hex.getBytes(content.getText()));
+				}
+				delimiter.build();
+				synchronized(SocketUI.this) {
+					currentJudger=new Blocker(false,true,delimiter::walk);
+					SocketUI.this.notifyAll();
+				}
+				confirmed=true;
+				dDialog.dispose();
+			});
+			dCancel.addActionListener(n->{
+				confirmed=false;
+				resumeBlocker();
+				dDialog.dispose();
+			});
+			dS.add(dOK);
+			dS.add(dCancel);
+			dS.add(dAdd);
+			dDialog.add(dS,BorderLayout.SOUTH);
+			dDialog.add(dM,BorderLayout.CENTER);
+			dDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+			//Dialog done
+			del.addActionListener(n->{
+				delimiter=new Delimiter();
+				confirmed=false;
+				preBlock();
+				dDialog.setVisible(true);
+				if(!confirmed) {
+					resumeBlocker();
+				}
+			});
 			JMenuItem distrunc=new JMenuItem("Resume the stream");
 			JMenuItem clear=new JMenuItem("Clear Screen");
 			JMenuItem vh=new JMenuItem("View Raw Data as Hex");
@@ -191,6 +368,9 @@ public class SocketUI extends JFrame implements Runnable{
 				SocketUI.this.notify();
 			});
 			trunc.add(trunc_now);
+			trunc.add(nonBlock);
+			trunc.add(length);
+			trunc.add(del);
 			data.add(vh);
 			data.add(clear);
 			data.add(trunc);
@@ -245,7 +425,7 @@ public class SocketUI extends JFrame implements Runnable{
 				public void windowClosed(WindowEvent e) {
 					viewHex.dispose();
 					HexInput.INSTANCE.dispose();
-					System.exit(0);
+					Stream.of(JFrame.getFrames()).forEach(frame->frame.dispose());
 				}
 				@Override
 				public void windowIconified(WindowEvent e) {}
@@ -260,7 +440,9 @@ public class SocketUI extends JFrame implements Runnable{
 		});
 	}
 	/*
-	 * Only used internally 
+	 * Classes
+	 * Only used internally classes
+	 * Only private classes can be set private
 	 */
 	private static class SpeedInput extends JFrame{
 		private LongConsumer up;
@@ -362,6 +544,68 @@ public class SocketUI extends JFrame implements Runnable{
 			try {
 				pane.getDocument().insertString(pane.getText().length(), str, RED);
 			} catch (BadLocationException e) {}
+		}
+	}
+	private static class FixedLength implements IntPredicate{
+		private long length;
+		private long current=0;
+		@Override
+		public boolean test(int value) {
+			++current;
+			if(current==length) {
+				current=0;
+				return true;
+			}
+			return false;
+		}
+		public void clear() {
+			current=0;
+		}
+		public void setLength(long l) {
+			length=l;
+		}
+	}
+	private static class Blocker{
+		private boolean bP,aP;
+		private IntPredicate pred;
+		Blocker(boolean b,boolean a,IntPredicate i){
+			bP=b;
+			aP=a;
+			pred=i;
+		}
+		public boolean test(int i) {
+			return pred.test(i);
+		}
+		public boolean aP() {
+			return aP;
+		}
+		public boolean bP() {
+			return bP;
+		}
+	}
+	//Classes done, Functions now
+	private void select(JMenuItem item) {
+		lastSelected.setEnabled(true);
+		item.setEnabled(false);
+		lastSelected=item;
+	}
+	private void block() {
+		setTitle(TITLE_BLOCKED);
+		try {
+			synchronized(this) {
+				wait();
+			}
+		} catch (InterruptedException e) {}
+		setTitle(TITLE);
+	}
+	private void preBlock() {
+		lastJudger=currentJudger;
+		currentJudger=BLOCKED;
+	}
+	public void resumeBlocker() {
+		synchronized(SocketUI.this) {
+			currentJudger=lastJudger;
+			SocketUI.this.notifyAll();
 		}
 	}
 }

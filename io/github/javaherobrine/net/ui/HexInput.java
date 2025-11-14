@@ -15,32 +15,8 @@ public class HexInput extends JFrame{
 			setTitle("Hex input");
 			JTextField field=new JTextField();
 			AbstractDocument doc=(AbstractDocument)field.getDocument();
-			doc.setDocumentFilter(new DocumentFilter() {
-				@Override
-				public void replace(DocumentFilter.FilterBypass fb,int offset,int length,String str,AttributeSet aset) throws BadLocationException{
-					StringBuilder sb=new StringBuilder();
-					for(int i=0;i<str.length();++i) {
-						char ch=str.charAt(i);
-						if(Character.isDigit(ch)) {
-							sb.append(ch);
-						}
-						if(ch>='a'&&ch<='f') {
-							sb.append(ch);
-						}
-						if(ch>='A'&&ch<='F') {
-							sb.append(ch);
-						}
-					}
-					super.replace(fb, offset, sb.length()-1, sb.toString(), aset);
-				}
-				@Override
-				public void insertString(DocumentFilter.FilterBypass fb,int offset,String str,AttributeSet aset) throws BadLocationException {
-					super.insertString(fb, offset, str, aset);
-				}
-			});
-			
+			doc.setDocumentFilter(new NumberFilter(16));
 			//dialogs
-			
 			JDialog dialog=new JDialog(this,"Convert String into Binary",true);
 			dialog.setSize(500, 500);
 			dialog.setLayout(new BorderLayout());
@@ -73,9 +49,7 @@ public class HexInput extends JFrame{
 			jp.add(cANCEL);
 			dialog.add(jp,BorderLayout.SOUTH);
 			dialog.setTitle("String Input");
-			
 			//dialog done
-			
 			setLayout(new BorderLayout());
 			add(new JLabel("Input Binary Data via Hex"),BorderLayout.NORTH);
 			add(field,BorderLayout.CENTER);
@@ -113,7 +87,6 @@ public class HexInput extends JFrame{
 				}
 				@Override
 				public void windowClosed(WindowEvent e) {
-					
 					dialog.dispose();
 				}
 				@Override
@@ -138,5 +111,38 @@ public class HexInput extends JFrame{
 			INSTANCE.callback=input;
 			INSTANCE.setVisible(true);
 		});
+	}
+	//Document Filter Class
+	public static class NumberFilter extends DocumentFilter{
+		int radix=10;
+		public NumberFilter(int r){
+			radix=r;
+		}
+		public NumberFilter() {}
+		private boolean isDigit(char ch) {
+			return Character.digit(ch,radix)!=-1;
+		}
+		@Override
+		public void replace(DocumentFilter.FilterBypass fb,int offset,int length,String str,AttributeSet aset) throws BadLocationException{
+			StringBuilder sb=new StringBuilder();
+			for(int i=0;i<str.length();++i) {
+				char ch=str.charAt(i);
+				if(isDigit(ch)) {
+					sb.append(ch);
+				}
+			}
+			super.replace(fb, offset, sb.length()-1, sb.toString(), aset);
+		}
+		@Override
+		public void insertString(DocumentFilter.FilterBypass fb,int offset,String str,AttributeSet aset) throws BadLocationException {
+			StringBuilder builder=new StringBuilder();
+			for(int i=0;i<str.length();++i) {
+				char ch=str.charAt(i);
+				if(isDigit(ch)) {
+					builder.append(ch);
+				}
+			}
+			super.insertString(fb, offset, builder.toString(), aset);
+		}
 	}
 }

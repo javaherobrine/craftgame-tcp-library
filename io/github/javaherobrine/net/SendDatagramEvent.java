@@ -38,4 +38,26 @@ public class SendDatagramEvent extends AbstractEvent{
 	public SendDatagramEvent(DatagramSocket socket,SocketAddress addr,byte[] d,int offset,int length) {
 		this(socket,addr,d,offset,length,MAX_DGRAM_LENGTH);
 	}
+	public static SendDatagramEvent[] split(DatagramSocket socket,SocketAddress addr,byte[] data,int MSS) {
+		int packets=data.length/MSS;
+		if(data.length%MSS!=0) {
+			++packets;
+		}
+		int len=data.length;
+		int offset=0;
+		SendDatagramEvent result[] =new SendDatagramEvent[packets];
+		for(int i=0;i<packets-1;++i) {
+			result[i]=new SendDatagramEvent(socket,addr,data,offset,MSS,MSS);
+			offset+=MSS;
+			len-=MSS;
+		}
+		result[packets-1]=new SendDatagramEvent(socket,addr,data,offset,len,MSS);
+		return result;
+	}
+	public DatagramSocket getLocal() {
+		return local;
+	}
+	public SocketAddress getRemote() {
+		return remote;
+	}
 }

@@ -1,6 +1,7 @@
 package io.github.javaherobrine.net.ui;
 import java.util.function.*;
 import javax.swing.*;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.net.*;
@@ -18,6 +19,8 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	private JPanel display=new JPanel();
 	private JDialog choose=new JDialog(this,"Transfer to File",true);
 	private EventDispatchThread EDT=new EventDispatchThread();
+	private boolean displaySend=true;
+	private int MSS=65528;
 	/*
 	 * They are all callbacks, too
 	 * Why is Java so Object-Oriented???
@@ -41,6 +44,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		}
 	};
 	// Callback done
+	@SuppressWarnings("unused")
 	public DatagramSocketUI(DatagramSocket socket) {
 		EDT.start();
 		this.socket=socket;
@@ -86,7 +90,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				} catch (FileNotFoundException e) {
 					JOptionPane.showMessageDialog(this, "Permission Denied", "Invalid Input",JOptionPane.ERROR_MESSAGE);
 					return;
-				} catch (IOException e) {}
+				} 
 				choose.dispose();
 			});
 			cancel.addActionListener(n->{
@@ -97,9 +101,6 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			choose.add(cNorth,BorderLayout.NORTH);
 			choose.add(cSouth,BorderLayout.SOUTH);
 			choose.pack();
-			//Dialog done
-			JMenuBar bar=new JMenuBar();
-			setLayout(new GridBagLayout());
 			JPanel bottom=new JPanel();
 			bottom.setLayout(new FlowLayout());
 			bottom.add(new JLabel("Remote Host="));
@@ -109,6 +110,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			bottom.add(new JLabel("Remote Port="));
 			rPort=new JTextField();
 			rPort.setColumns(5);
+			((AbstractDocument)rPort.getDocument()).setDocumentFilter(new HexInput.NumberFilter());
 			bottom.add(rPort);
 			JButton send=new JButton("Send");
 			send.addActionListener(n->{
@@ -116,6 +118,9 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				input.setText("");
 			});
 			bottom.add(send);
+			//Dialog done
+			//menus
+			JMenuBar bar=new JMenuBar();
 			//Process Multicast DatagramSocket
 			if(socket instanceof MulticastSocket multi) {
 				try {
@@ -134,7 +139,18 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				}
 			}
 			//multicast done
+			JMenu network=new JMenu("Network");
+			JMenuItem upload=new JMenuItem("Upload File");
+			upload.addActionListener(n->{
+				if(SocketUI.CHOOSER.showDialog(this,"OK")==JFileChooser.APPROVE_OPTION) {
+					File f=SocketUI.CHOOSER.getSelectedFile();
+					if(f.isDirectory()) {
+						JOptionPane.showMessageDialog(this,"Can't update a folder, maybe you can archive them?","Illegal Input", JOptionPane.ERROR_MESSAGE);
+					}
+				}
+			});
 			setJMenuBar(bar);
+			//menu done
 			JPanel panel=new JPanel(new BorderLayout());
 			panel.add(bottom,BorderLayout.SOUTH);
 			panel.add(new JScrollPane(input),BorderLayout.NORTH);
