@@ -30,12 +30,15 @@ public class SocketUI extends JFrame implements Runnable{
 	private Blocker currentJudger=BLOCKED;
 	private Blocker lastJudger;
 	private final HexView viewHex=new HexView();
-	private final OutputEvent write=new OutputEvent(null,null);
+	private final OutputEvent write=new OutputEvent(null,null,0,0);
 	private final FixedLength FL_INSTANCE=new FixedLength();
 	private final Blocker FLB=new Blocker(false,true,FL_INSTANCE);
 	private boolean nRedirect=true;//don't output to file
 	private boolean nDisplay=false;//don't display in the screen
+	private boolean nSend=false;//don't display send in the screen
 	private boolean confirmed=false;//whether the dialog is confirmed
+	private boolean blocked=false;
+	private boolean lastBlocked;
 	private String TITLE;
 	private String TITLE_BLOCKED;
 	private byte[] HEX_TEMP;
@@ -229,6 +232,7 @@ public class SocketUI extends JFrame implements Runnable{
 			lN.add(new JLabel("Length="));
 			JTextField lenTF=new JTextField();
 			((AbstractDocument)lenTF.getDocument()).setDocumentFilter(new HexInput.NumberFilter());
+			lenTF.setColumns(20);
 			lN.add(lenTF);
 			lN.add(new JLabel("Byte(s)"));
 			len.add(lN,BorderLayout.NORTH);
@@ -271,17 +275,14 @@ public class SocketUI extends JFrame implements Runnable{
 				if(confirmed) {
 					synchronized(SocketUI.this) {
 						currentJudger=FLB;
-						SocketUI.this.notifyAll();
 					}
 					select(length);
 				}else {
-					synchronized(SocketUI.this) {
-						SocketUI.this.notifyAll();
-					}
+					resumeBlocker();
 				}
 			});
 			//Delimiter Dialogs
-			JDialog dDialog=new JDialog(this,"",true);
+			JDialog dDialog=new JDialog(this,"Delimiters (Match one of them)",true);
 			dDialog.setSize(600,600);
 			JPanel dS=new JPanel();
 			FlowLayout dFL=new FlowLayout();
@@ -295,7 +296,7 @@ public class SocketUI extends JFrame implements Runnable{
 			JButton dCancel=new JButton("Cancel");
 			dAdd.addActionListener(n->{
 				passed=false;
-				HexInput.input(PASS_RETURN_VALUE);
+				HexInput.inputBlocked(PASS_RETURN_VALUE);
 				if(passed) {
 					JPanel inner=new JPanel();
 					FlowLayout infl=new FlowLayout();
@@ -312,10 +313,9 @@ public class SocketUI extends JFrame implements Runnable{
 					inner.add(new JScrollPane(itf));
 					inner.add(delete);
 					dM.add(inner);
-					dM.revalidate();
-					dM.repaint();
-					dDialog.revalidate();
-					dDialog.repaint();
+					SwingUtilities.updateComponentTreeUI(dCancel);
+					SwingUtilities.updateComponentTreeUI(dM);
+					SwingUtilities.updateComponentTreeUI(dDialog);
 				}
 			});
 			dOK.addActionListener(n->{
@@ -323,20 +323,18 @@ public class SocketUI extends JFrame implements Runnable{
 				for(int i=0;i<components.length;++i) {
 					JPanel current=(JPanel)components[i];
 					JScrollPane pane=(JScrollPane)current.getComponent(0);
-					JTextField content=(JTextField)pane.getComponent(0);
+					JTextField content=(JTextField)pane.getViewport().getComponent(0);
 					delimiter.delimiter(Hex.getBytes(content.getText()));
 				}
 				delimiter.build();
 				synchronized(SocketUI.this) {
 					currentJudger=new Blocker(false,true,delimiter::walk);
-					SocketUI.this.notifyAll();
 				}
 				confirmed=true;
 				dDialog.dispose();
 			});
 			dCancel.addActionListener(n->{
 				confirmed=false;
-				resumeBlocker();
 				dDialog.dispose();
 			});
 			dS.add(dOK);
@@ -351,12 +349,24 @@ public class SocketUI extends JFrame implements Runnable{
 				confirmed=false;
 				preBlock();
 				dDialog.setVisible(true);
-				if(!confirmed) {
+				if(confirmed) {
+					select(del);
+				}else {
 					resumeBlocker();
 				}
 			});
 			JMenuItem distrunc=new JMenuItem("Resume the stream");
 			JMenuItem clear=new JMenuItem("Clear Screen");
+			JMenuItem sh=new JMenuItem("Hide data you sent");
+			sh.addActionListener(n->{
+				if(nSend) {
+					sh.setText("Hide data you sent");
+					nSend=false;
+				}else {
+					sh.setText("Show data you sent");
+					nSend=true;
+				}
+			});
 			JMenuItem vh=new JMenuItem("View Raw Data as Hex");
 			vh.addActionListener(n->{
 				viewHex.setVisible(true);
@@ -365,7 +375,9 @@ public class SocketUI extends JFrame implements Runnable{
 				show.setText("");
 			});
 			distrunc.addActionListener(n->{
-				SocketUI.this.notify();
+				synchronized(SocketUI.this) {
+					SocketUI.this.notifyAll();
+				}
 			});
 			trunc.add(trunc_now);
 			trunc.add(nonBlock);
@@ -375,6 +387,7 @@ public class SocketUI extends JFrame implements Runnable{
 			data.add(clear);
 			data.add(trunc);
 			data.add(distrunc);
+			data.add(sh);
 			file.add(upload);
 			file.add(close);
 			file.add(sendBinary);
@@ -398,10 +411,12 @@ public class SocketUI extends JFrame implements Runnable{
 			panel.add(scroll0,BorderLayout.CENTER);
 			panel.add(scroll1,BorderLayout.SOUTH);
 			send.addActionListener(n->{
-				viewHex.insertSend(Hex.toHex(input.getText().getBytes()));
 				input.setEditable(false);
+				if(!nSend) {
+					show.append(input.getText());
+					viewHex.insertSend(Hex.toHex(input.getText().getBytes()));
+				}
 				EDT.put(new OutputEvent(out,input.getText().getBytes()));
-				show.append(input.getText());
 				input.setEditable(true);
 				input.setText("");
 			});
@@ -425,7 +440,7 @@ public class SocketUI extends JFrame implements Runnable{
 				public void windowClosed(WindowEvent e) {
 					viewHex.dispose();
 					HexInput.INSTANCE.dispose();
-					Stream.of(JFrame.getFrames()).forEach(frame->frame.dispose());
+					Stream.of(JFrame.getWindows()).forEach(frame->frame.dispose());
 				}
 				@Override
 				public void windowIconified(WindowEvent e) {}
@@ -591,21 +606,26 @@ public class SocketUI extends JFrame implements Runnable{
 	}
 	private void block() {
 		setTitle(TITLE_BLOCKED);
+		blocked=true;
 		try {
 			synchronized(this) {
 				wait();
 			}
 		} catch (InterruptedException e) {}
+		blocked=false;
 		setTitle(TITLE);
 	}
 	private void preBlock() {
+		lastBlocked=blocked;
 		lastJudger=currentJudger;
 		currentJudger=BLOCKED;
 	}
 	public void resumeBlocker() {
 		synchronized(SocketUI.this) {
 			currentJudger=lastJudger;
-			SocketUI.this.notifyAll();
+			if(!lastBlocked) {
+				SocketUI.this.notifyAll();
+			}
 		}
 	}
 }

@@ -4,7 +4,7 @@ public class Hex {
 	public static String toHex(byte[] data) {
 		StringBuilder builder=new StringBuilder(data.length<<1);
 		for(int i=0;i<data.length;++i) {
-			builder.append(CHARMAP[data[i]>>4]);
+			builder.append(CHARMAP[(data[i]&0xFF)>>4]);
 			builder.append(CHARMAP[data[i]&0xF]);
 		}
 		return builder.toString();
@@ -17,6 +17,6 @@ public class Hex {
 		return block;
 	}
 	public static String toHex(byte b) {
-		return Character.toString(CHARMAP[b>>4])+Character.toString(CHARMAP[b&0xF]);
+		return Character.toString(CHARMAP[(b&0xFF)>>4])+Character.toString(CHARMAP[b&0xF]);
 	}
 }

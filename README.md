@@ -19,3 +19,5 @@ If you don't want to simulate bad situations, you can delete package `io.github.
 If you discovered this repository in 2021, you may know what I'm saying
 
 Note: some of UDP code was not written by CraftGame Studio and maybe there will be some implementations that differ from Java_Herobrine's(in package io.gitub.javaherobrine) or LovelyZeeiam's(in package xueli) (and their subpackages), and it is CC0 licensed instead of MIT.
+
+Note: Pure AI-generated code without your inspection is forbidden here

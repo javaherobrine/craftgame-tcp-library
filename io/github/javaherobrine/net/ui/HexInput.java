@@ -5,12 +5,13 @@ import javax.swing.text.*;
 import java.util.function.*;
 import java.awt.event.*;
 import java.nio.charset.*;
-public class HexInput extends JFrame{
+public class HexInput extends JDialog{
 	private static final long serialVersionUID = 1L;
 	private Consumer<byte[]> callback;
 	static HexInput INSTANCE = new HexInput();
 	@SuppressWarnings("unused")
 	private HexInput() {
+		super((Frame)null,"",true);
 		SwingUtilities.invokeLater(()->{
 			setTitle("Hex input");
 			JTextField field=new JTextField();
@@ -111,6 +112,11 @@ public class HexInput extends JFrame{
 			INSTANCE.callback=input;
 			INSTANCE.setVisible(true);
 		});
+	}
+	public static void inputBlocked(Consumer<byte[]> input) {
+		INSTANCE.pack();
+		INSTANCE.callback=input;
+		INSTANCE.setVisible(true);
 	}
 	//Document Filter Class
 	public static class NumberFilter extends DocumentFilter{
