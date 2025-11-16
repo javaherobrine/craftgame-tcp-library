@@ -44,6 +44,8 @@ public class SocketUI extends JFrame implements Runnable{
 	private byte[] HEX_TEMP;
 	private boolean passed;
 	private Delimiter delimiter;
+	private String lastFile="WINE Is Not an Emulator";
+	private OutputStream fOut=OutputStream.nullOutputStream();
 	/*
 	 * Fields done, then callbacks
 	 * It works like a function pointer.
@@ -60,9 +62,11 @@ public class SocketUI extends JFrame implements Runnable{
 		HEX_TEMP=block;
 	};
 	private final Consumer<byte[]> SEND_HEX=block->{
-		try {
-			out.write(block);
-		} catch (IOException e) {}
+		EDT.put(new OutputEvent(out,block));
+		if(!nSend) {
+			viewHex.insertSend(Hex.toHex(block));
+			show.append(new String(block));
+		}
 	};
 	private final Consumer<byte[]> SEND_URG=block->{
 		EDT.put(new UrgentDataEvent(socket,block));
@@ -98,7 +102,6 @@ public class SocketUI extends JFrame implements Runnable{
 			} catch (InterruptedException e) {}
 		}
 	};
-	private Runnable processor=DISPLAY_IN_SCREEN;
 	/*
 	 * Callback over, now initialize some fields
 	 */
@@ -129,7 +132,8 @@ public class SocketUI extends JFrame implements Runnable{
 				if(currentJudger.bP()&&result) {
 					block();
 				}
-				processor.run();
+				DISPLAY_IN_SCREEN.run();
+				TRANSFER_TO_FILE.run();
 				if(currentJudger.aP()&&result) {
 					block();
 				}
@@ -171,7 +175,9 @@ public class SocketUI extends JFrame implements Runnable{
 						}
 						InputStream in=new BufferedInputStream(new FileInputStream(f));
 						EDT.put(new InputTransferEvent(in,out));
-						show.append("\n"+f.length()+"bytes from file were sent\n");
+						if(!nSend) {
+							show.append("\n"+f.length()+"bytes from file were sent\n");
+						}
 					}catch (Exception e) {}
 				}
 			});
@@ -205,7 +211,7 @@ public class SocketUI extends JFrame implements Runnable{
 			});
 			JMenuItem author=new JMenuItem("Authors");
 			author.addActionListener(n->{
-				JOptionPane.showMessageDialog(this, "Java_Herobrine from CraftGame Studio\nB-a-s-d-y from USTC");
+				JOptionPane.showMessageDialog(this, "Java_Herobrine from CraftGame Studio\nB-a-s-d-y from USTC\nUstcXu from USTC","Credits",JOptionPane.INFORMATION_MESSAGE);
 			});
 			help.add(author);
 			JMenu data=new JMenu("Data");
@@ -379,6 +385,83 @@ public class SocketUI extends JFrame implements Runnable{
 					SocketUI.this.notifyAll();
 				}
 			});
+			JMenuItem redirect=new JMenuItem("Redirect Data you received");
+			//Redirect Dialog
+			JDialog rDialog=new JDialog(this,"Data Redirect",true);
+			rDialog.setLayout(new BorderLayout());
+			JCheckBox r2S=new JCheckBox("Display in screen"),r2F=new JCheckBox("Output to file");
+			JPanel rNorth=new JPanel(new FlowLayout());
+			rNorth.add(r2F);
+			rNorth.add(r2S);
+			rDialog.add(rNorth,BorderLayout.NORTH);
+			JPanel rSouth=new JPanel(new FlowLayout());
+			rSouth.add(new JLabel("File="));
+			JTextField rTF=new JTextField();
+			rTF.setColumns(20);
+			JButton rCF=new JButton("Choose File");
+			rCF.addActionListener(n->{
+				if(CHOOSER.showDialog(rDialog,"Transfer to")==0) {
+					rTF.setText(CHOOSER.getSelectedFile().getAbsolutePath());
+				}
+			});
+			JCheckBox rA=new JCheckBox("Append");
+			rSouth.add(rTF);
+			rSouth.add(rCF);
+			rSouth.add(rA);
+			rDialog.add(rSouth,BorderLayout.SOUTH);
+			rDialog.pack();
+			rDialog.addWindowListener(new WindowListener() {
+				@Override
+				public void windowOpened(WindowEvent e) {}
+				@Override
+				public void windowClosing(WindowEvent e) {
+					if(r2F.isSelected()) {
+						File now=new File(rTF.getText());
+						if(now.isDirectory()) {
+							JOptionPane.showMessageDialog(rDialog,"Can't write into a folder","Invalid Input",JOptionPane.ERROR_MESSAGE);
+							return;
+						}
+						FileOutputStream fOutNow=null;
+						boolean nChangeStream=rTF.getText().equals(lastFile);
+						if(nRedirect||(!nChangeStream)) {
+							try {
+								fOutNow=new FileOutputStream(now,rA.isSelected());
+							} catch (FileNotFoundException e1) {
+								JOptionPane.showMessageDialog(rDialog,"Permission Denied","Invalid Input",JOptionPane.ERROR_MESSAGE);
+								return;
+							}
+						}
+						if(!(nChangeStream||nRedirect)) {
+							try {
+								fOut.close();
+							} catch (IOException e1) {
+								System.err.println("[Error] FileOutputStream can't be closed");
+							}
+						}
+						if(!nChangeStream) {
+							fOut=fOutNow;
+							write.setStream(fOut);
+						}
+					}
+					nDisplay=!r2S.isSelected();
+					nRedirect=!r2F.isSelected();
+					rDialog.dispose();
+				}
+				@Override
+				public void windowClosed(WindowEvent e) {}
+				@Override
+				public void windowIconified(WindowEvent e) {}
+				@Override
+				public void windowDeiconified(WindowEvent e) {}
+				@Override
+				public void windowActivated(WindowEvent e) {}
+				@Override
+				public void windowDeactivated(WindowEvent e) {}
+			});
+			//Dialog done
+			redirect.addActionListener(n->{
+				rDialog.setVisible(true);
+			});
 			trunc.add(trunc_now);
 			trunc.add(nonBlock);
 			trunc.add(length);
@@ -388,6 +471,7 @@ public class SocketUI extends JFrame implements Runnable{
 			data.add(trunc);
 			data.add(distrunc);
 			data.add(sh);
+			data.add(redirect);
 			file.add(upload);
 			file.add(close);
 			file.add(sendBinary);
