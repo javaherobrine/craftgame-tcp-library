@@ -30,7 +30,6 @@ public class SocketUI extends JFrame implements Runnable{
 	private Blocker currentJudger=BLOCKED;
 	private Blocker lastJudger;
 	private final HexView viewHex=new HexView();
-	private final OutputEvent write=new OutputEvent(null,null,0,0);
 	private final FixedLength FL_INSTANCE=new FixedLength();
 	private final Blocker FLB=new Blocker(false,true,FL_INSTANCE);
 	private boolean nRedirect=true;//don't output to file
@@ -46,6 +45,14 @@ public class SocketUI extends JFrame implements Runnable{
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
+	public static final String CREDITS="""
+		Programming:
+			Java_Herobrine from CraftGame Studio
+			B-a-s-d-y from USTC
+			UstcXu from USTC
+		Special Thanks:
+			All members of CraftGame Studio
+		""";
 	/*
 	 * Fields done, then callbacks
 	 * It works like a function pointer.
@@ -94,13 +101,9 @@ public class SocketUI extends JFrame implements Runnable{
 		if(nRedirect) {
 			return;
 		}
-		write.setData(currentValue);
-		synchronized(write) {
-			EDT.put(write);
-			try {
-				write.wait();
-			} catch (InterruptedException e) {}
-		}
+		try {
+			fOut.write(currentValue);
+		} catch (IOException e) {}
 	};
 	/*
 	 * Callback over, now initialize some fields
@@ -195,7 +198,7 @@ public class SocketUI extends JFrame implements Runnable{
 			limit.addActionListener(n->{
 				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
 			});
-			JMenuItem urg=new JMenuItem("Urgent Data");
+			JMenuItem urg=new JMenuItem("Send Urgent Data");
 			urg.addActionListener(n->{
 				HexInput.input(SEND_URG);
 			});
@@ -209,9 +212,9 @@ public class SocketUI extends JFrame implements Runnable{
 					JOptionPane.showMessageDialog(this,str,"License",JOptionPane.INFORMATION_MESSAGE);
 				} catch (IOException e) {}
 			});
-			JMenuItem author=new JMenuItem("Authors");
+			JMenuItem author=new JMenuItem("Credits");
 			author.addActionListener(n->{
-				JOptionPane.showMessageDialog(this, "Java_Herobrine from CraftGame Studio\nB-a-s-d-y from USTC\nUstcXu from USTC","Credits",JOptionPane.INFORMATION_MESSAGE);
+					JOptionPane.showMessageDialog(this,CREDITS,"Credits",JOptionPane.INFORMATION_MESSAGE);
 			});
 			help.add(author);
 			JMenu data=new JMenu("Data");
@@ -418,7 +421,7 @@ public class SocketUI extends JFrame implements Runnable{
 					if(r2F.isSelected()) {
 						File now=new File(rTF.getText());
 						if(now.isDirectory()) {
-							JOptionPane.showMessageDialog(rDialog,"Can't write into a folder","Invalid Input",JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(rDialog,"Can't write into a folder","Illegal Input",JOptionPane.ERROR_MESSAGE);
 							return;
 						}
 						FileOutputStream fOutNow=null;
@@ -427,7 +430,7 @@ public class SocketUI extends JFrame implements Runnable{
 							try {
 								fOutNow=new FileOutputStream(now,rA.isSelected());
 							} catch (FileNotFoundException e1) {
-								JOptionPane.showMessageDialog(rDialog,"Permission Denied","Invalid Input",JOptionPane.ERROR_MESSAGE);
+								JOptionPane.showMessageDialog(rDialog,"Permission Denied","Illegal Input",JOptionPane.ERROR_MESSAGE);
 								return;
 							}
 						}
@@ -435,12 +438,11 @@ public class SocketUI extends JFrame implements Runnable{
 							try {
 								fOut.close();
 							} catch (IOException e1) {
-								System.err.println("[Error] FileOutputStream can't be closed");
+								System.err.println("[ERROR] FileOutputStream can't be closed");
 							}
 						}
 						if(!nChangeStream) {
 							fOut=fOutNow;
-							write.setStream(fOut);
 						}
 					}
 					nDisplay=!r2S.isSelected();
@@ -548,7 +550,6 @@ public class SocketUI extends JFrame implements Runnable{
 		private LongConsumer down;
 		private static final long serialVersionUID = 1L;
 		private static final SpeedInput INSTANCE=new SpeedInput();
-		@SuppressWarnings("unused")
 		private SpeedInput() {
 			SwingUtilities.invokeLater(()->{
 				setTitle("Speed Limiter");
@@ -573,23 +574,27 @@ public class SocketUI extends JFrame implements Runnable{
 				add(upload,BorderLayout.NORTH);
 				add(download,BorderLayout.CENTER);
 				JLabel no=new JLabel("0 for no limitation");
-				JPanel button=new JPanel();
-				button.setLayout(new FlowLayout());
-				button.add(no);
-				JButton OK=new JButton("OK");
-				OK.addActionListener(n->{
-					up.accept((Long)u1.getValue());
-					down.accept((Long)u2.getValue());
-					dispose();
+				add(no,BorderLayout.SOUTH);
+				addWindowListener(new WindowListener() {
+					@Override
+					public void windowOpened(WindowEvent e) {}
+					@Override
+					public void windowClosing(WindowEvent e) {
+						up.accept((Long)u1.getValue());
+						down.accept((Long)u2.getValue());
+						dispose();
+					}
+					@Override
+					public void windowClosed(WindowEvent e) {}
+					@Override
+					public void windowIconified(WindowEvent e) {}
+					@Override
+					public void windowDeiconified(WindowEvent e) {}
+					@Override
+					public void windowActivated(WindowEvent e) {}
+					@Override
+					public void windowDeactivated(WindowEvent e) {}
 				});
-				JButton cancel=new JButton("Cancel");
-				cancel.addActionListener(n->{
-					dispose();
-				});
-				button.add(OK);
-				button.add(cancel);
-				add(button,BorderLayout.SOUTH);
-				setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 				pack();
 			});
 		}

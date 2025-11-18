@@ -54,10 +54,19 @@ public class SendDatagramEvent extends AbstractEvent{
 		result[packets-1]=new SendDatagramEvent(socket,addr,data,offset,len,MSS);
 		return result;
 	}
-	public DatagramSocket getLocal() {
+	public DatagramSocket local() {
 		return local;
 	}
-	public SocketAddress getRemote() {
+	public SocketAddress remote() {
 		return remote;
+	}
+	public byte[] data() {
+		return data;
+	}
+	public int offset() {
+		return offset;
+	}
+	public int length() {
+		return length;
 	}
 }
