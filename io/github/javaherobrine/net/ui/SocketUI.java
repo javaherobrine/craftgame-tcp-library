@@ -71,13 +71,13 @@ public class SocketUI extends JFrame implements Runnable{
 	private final Consumer<byte[]> SEND_HEX=block->{
 		EDT.put(new OutputEvent(out,block));
 		if(!nSend) {
-			viewHex.insertSend(Hex.toHex(block));
+			viewHex.insertSend(block);
 			show.append(new String(block));
 		}
 	};
 	private final Consumer<byte[]> SEND_URG=block->{
 		EDT.put(new UrgentDataEvent(socket,block));
-		viewHex.insertURG(Hex.toHex(block));
+		viewHex.insertURG(block);
 	};
 	private final LongConsumer LIMIT_UP=speed->{
 		out.speed=speed;
@@ -87,7 +87,7 @@ public class SocketUI extends JFrame implements Runnable{
 	};
 	private final Runnable APPEND_STRING=()->{
 		show.append(Character.toString((char)currentValue));
-		viewHex.insertRecv(Hex.toHex((byte)currentValue));
+		viewHex.insertRecv(currentValue);
 	};
 	private final Runnable DISPLAY_IN_SCREEN=()->{
 		if(nDisplay) {
@@ -500,7 +500,7 @@ public class SocketUI extends JFrame implements Runnable{
 				input.setEditable(false);
 				if(!nSend) {
 					show.append(input.getText());
-					viewHex.insertSend(Hex.toHex(input.getText().getBytes()));
+					viewHex.insertSend(input.getText().getBytes());
 				}
 				EDT.put(new OutputEvent(out,input.getText().getBytes()));
 				input.setEditable(true);
@@ -518,6 +518,7 @@ public class SocketUI extends JFrame implements Runnable{
 				public void windowClosing(WindowEvent e) {
 					try {
 						socket.close();
+						fOut.close();
 					} catch (IOException e1) {}
 					dispose();
 					EDT.interrupt();
@@ -527,6 +528,16 @@ public class SocketUI extends JFrame implements Runnable{
 					viewHex.dispose();
 					HexInput.INSTANCE.dispose();
 					Stream.of(JFrame.getWindows()).forEach(frame->frame.dispose());
+					Stream.of(JFrame.getWindows()).forEach(System.err::println);
+					System.err.println();
+					Stream.of(JFrame.getOwnerlessWindows()).forEach(System.err::println);
+					Thread.getAllStackTraces().forEach((k,v)->{
+						System.err.println(k);
+						for(int i=0;i<v.length;++i) {
+							System.err.println(" "+v[i]);
+						}
+					});
+					//Bug: EDT in AWT & Swing won't terminate correctly
 				}
 				@Override
 				public void windowIconified(WindowEvent e) {}
@@ -608,6 +619,8 @@ public class SocketUI extends JFrame implements Runnable{
 		}
 	}
 	private static class HexView extends JFrame{
+		public static final int LINE=20;
+		private int line=0;
 		private static final long serialVersionUID = 1L;
 		private JTextPane pane;
 		private static final SimpleAttributeSet RED=new SimpleAttributeSet(),BLUE=new SimpleAttributeSet(),GREEN=new SimpleAttributeSet();
@@ -621,7 +634,8 @@ public class SocketUI extends JFrame implements Runnable{
 				pane=new JTextPane();
 				pane.setEditable(false);
 				setSize(500,500);
-				add(pane);
+				setResizable(false);
+				add(new JScrollPane(pane));
 				JMenuBar bar=new JMenuBar();
 				JMenu data=new JMenu("Data");
 				JMenuItem cls=new JMenuItem("Clear Screen");
@@ -634,19 +648,43 @@ public class SocketUI extends JFrame implements Runnable{
 				setJMenuBar(bar);
 			});
 		}
-		public void insertSend(String str) {
+		private void newLine() {
+			++line;
+			if(line==20) {
+				try {
+					line=0;
+					pane.getDocument().insertString(pane.getText().length(),"\n",null);
+				} catch (BadLocationException e) {}
+			}
+		}
+		public void insertSend(byte[] str) {
 			try {
-				pane.getDocument().insertString(pane.getText().length(), str, GREEN);
+				int offset=pane.getText().length();
+				for(int i=0;i<str.length;++i) {
+					pane.getDocument().insertString(offset,Hex.toHex(str[i]),GREEN);
+					pane.getDocument().insertString(offset+2," ",GREEN);
+					offset+=3;
+					newLine();
+				}
 			} catch (BadLocationException e) {} 
 		}
-		public void insertRecv(String str) {
+		public void insertRecv(int str) {
 			try {
-				pane.getDocument().insertString(pane.getText().length(), str, BLUE);
+				int offset=pane.getText().length();
+				pane.getDocument().insertString(offset, Hex.toHex((byte)str), BLUE);
+				pane.getDocument().insertString(offset+2, " ", BLUE);
 			} catch (BadLocationException e) {}
+			newLine();
 		}
-		public void insertURG(String str) {
+		public void insertURG(byte[] str) {
 			try {
-				pane.getDocument().insertString(pane.getText().length(), str, RED);
+				int offset=pane.getText().length();
+				for(int i=0;i<str.length;++i) {
+					pane.getDocument().insertString(offset,Hex.toHex(str[i]),RED);
+					pane.getDocument().insertString(offset+2," ",RED);
+					offset+=3;
+					newLine();
+				}
 			} catch (BadLocationException e) {}
 		}
 	}

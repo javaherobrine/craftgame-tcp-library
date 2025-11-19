@@ -1,0 +1,4 @@
+Known bugs:
+1. AWT Thread Issues (issue #1)
+	-EDT in AWT & Swing won't terminate correctly sometimes if you use io.github.javaherobrine.net.ui.SocketUI
+	-Solution: kill this process when everything is done

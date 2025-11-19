@@ -38,9 +38,43 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				return;
 			}
 			InetSocketAddress remote=new InetSocketAddress(IP,i);
-			EDT.put(new SendDatagramEvent(socket, remote, b));
-			if(displaySend)
-				displayData(b,socket.getLocalSocketAddress(),remote,true);
+			if(b.length>MSS) {
+				switch(proc) {
+				case OutOfLength.DISCARD:
+					byte[] temp=new byte[MSS];
+					System.arraycopy(b,0,temp,0,MSS);
+					EDT.put(new SendDatagramEvent(socket,remote,b));
+					b=temp;
+					if(displaySend) {
+						displayData(b,socket.getLocalSocketAddress(),remote,true);
+					}
+					break;
+				case OutOfLength.SEND:
+					SendDatagramEvent[] events=SendDatagramEvent.split(socket,remote,b, MSS);
+					for(int j=0;j<events.length;++j) {
+						EDT.put(events[j]);
+						if(displaySend) {
+							displayData(events[j].data(),socket.getLocalSocketAddress(),events[j].remote(),true);
+						}
+					}
+					break;
+				case OutOfLength.QUEUE:
+					SendDatagramEvent[] events0=SendDatagramEvent.split(socket,remote,b,MSS);
+					EDT.put(events0[0]);
+					if(displaySend) {
+						displayData(events0[0].data(),socket.getLocalSocketAddress(),events0[0].remote(),true);
+					}
+					for(int k=1;k<events0.length;++k) {
+						queue.put(events0[k],"Data Fragment "+i);
+					}
+					break;
+				}
+			}else {
+				EDT.put(new SendDatagramEvent(socket, remote, b));
+				if(displaySend) {
+					displayData(b,socket.getLocalSocketAddress(),remote,true);
+				}
+			}
 		} catch (UnknownHostException e) {
 			JOptionPane.showMessageDialog(this, "Invalid Hostname", "Illegal Input", JOptionPane.ERROR_MESSAGE);
 			fail=true;
@@ -133,18 +167,95 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			//Process Multicast DatagramSocket
 			if(socket instanceof MulticastSocket multi) {
 				try {
+					multi.setBroadcast(true);
 					JMenu multicast=new JMenu("Multicast");
-					JMenuItem inter=new JMenuItem("Select Interface");
+					JMenuItem inter=new JMenuItem("Multicast Configurations");
 					JComboBox<String> interfaces=new JComboBox<>();
 					ArrayList<NetworkInterface> iList=new ArrayList<>();
 					NetworkInterface.networkInterfaces().forEach(i->{
 						iList.add(i);
 						interfaces.addItem(i.getName());
 					});
+					interfaces.setSelectedIndex(0);
+					//Dialog begin
 					JDialog selectInterface=new JDialog(this,"Select Interface",true);
 					selectInterface.setLayout(new BoxLayout(this,BoxLayout.Y_AXIS));
-				} catch (SocketException e) {
-					System.err.println("[FATAL] No Interface");
+					JPanel interf=new JPanel();
+					interf.setLayout(new FlowLayout());
+					interf.add(new JLabel("Interface="));
+					interf.add(interfaces);
+					selectInterface.add(interf);
+					JPanel TTL=new JPanel();
+					TTL.setLayout(new FlowLayout());
+					TTL.add(new JLabel("TTL="));
+					JTextField ttl=new JTextField();
+					ttl.setColumns(3);
+					ttl.setText(Integer.toString(multi.getTimeToLive()));
+					((AbstractDocument)ttl.getDocument()).setDocumentFilter(new HexInput.NumberFilter(10));
+					TTL.add(ttl);
+					selectInterface.add(TTL);
+					JCheckBox loop=new JCheckBox("Loopback");
+					selectInterface.add(loop);
+					selectInterface.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+					selectInterface.addWindowListener(new WindowListener(){
+						@Override
+						public void windowOpened(WindowEvent e) {}
+						@Override
+						public void windowClosing(WindowEvent e) {
+								try {
+									int i=Integer.parseInt(ttl.getText());
+									if(i>255) {
+										JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+										return;
+									}
+									multi.setNetworkInterface(iList.get(interfaces.getSelectedIndex()));
+									multi.setTimeToLive(i);
+									multi.setOption(StandardSocketOptions.IP_MULTICAST_LOOP,loop.isSelected());
+								}catch(NumberFormatException nfe) {
+									JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+									return;
+								} catch (IOException e1) {
+									System.err.println("[WARNING] Bad Options");
+								}
+								selectInterface.dispose();
+						}
+						@Override
+						public void windowClosed(WindowEvent e) {}
+						@Override
+						public void windowIconified(WindowEvent e) {}
+						@Override
+						public void windowDeiconified(WindowEvent e) {}
+						@Override
+						public void windowActivated(WindowEvent e) {}
+						@Override
+						public void windowDeactivated(WindowEvent e) {}			
+					});
+					//Dialog done
+					inter.addActionListener(n->{
+						selectInterface.setVisible(true);
+					});
+					JMenuItem toggle=new JMenuItem("Disable Multicast");
+					toggle.addActionListener(n->{
+						boolean enabled=inter.isEnabled();
+						if(enabled) {
+							try {
+								multi.setBroadcast(false);
+								inter.setEnabled(false);
+								toggle.setText("Enable Multicast");
+							} catch (SocketException e1) {}
+						}else {
+							try {
+								multi.setBroadcast(true);
+								inter.setEnabled(true);
+								toggle.setText("Disable Multicast");
+							}catch (SocketException e2) {}
+						}
+					});
+					multicast.add(inter);
+					multicast.add(toggle);
+					bar.add(multicast);
+				} catch (IOException e) {
+					System.err.println("[FATAL] Multicast Not Supported");
 				}
 			}
 			//multicast done
@@ -183,6 +294,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 								break;
 							case QUEUE:
 								queue.put(new SendDatagramEvent(socket,new InetSocketAddress(rHost.getText(),Integer.parseInt(rPort.getText())),in.readNBytes(s)),"File Fragment "+i);
+								++i;
 								break;
 							}
 							len-=s;
@@ -223,6 +335,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			sSouth.add(sDiscard);
 			sSouth.add(sSend);
 			sSouth.add(sQueue);
+			sizeDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 			sizeDialog.addWindowListener(new WindowListener() {
 				@Override
 				public void windowOpened(WindowEvent e) {}
@@ -249,16 +362,20 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						if(prev==OutOfLength.QUEUE&&proc!=prev&&queue.nonEmpty()) {
 							if(JOptionPane.showConfirmDialog(sizeDialog,"If you switch to another way, all the data in the queue will be discarded, will you?","Confirmation",JOptionPane.YES_NO_OPTION)!=JOptionPane.YES_OPTION) {
 								proc=prev;
+								sSend.setSelected(false);
+								sDiscard.setSelected(false);
+								sQueue.setSelected(true);
 							}
 						}else if(prev!=OutOfLength.QUEUE&&proc==OutOfLength.QUEUE) {
 							queue=new SendQueue();
 							showQueue.setEnabled(true);
 						}
-						if(proc!=OutOfLength.QUEUE) {
+						if(proc!=OutOfLength.QUEUE&&prev==OutOfLength.QUEUE) {
 							showQueue.setEnabled(false);
 							queue.dispose();
 							queue=null;
 						}
+						sizeDialog.dispose();
 					}catch(NumberFormatException nfe) {
 						JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
 						return;
@@ -275,6 +392,8 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				@Override
 				public void windowDeactivated(WindowEvent e) {}
 			});
+			sizeDialog.add(sSouth,BorderLayout.SOUTH);
+			sizeDialog.pack();
 			//Dialog end
 			showQueue.addActionListener(n->{
 				queue.setVisible(true);
@@ -286,6 +405,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			network.add(upload);
 			network.add(size);
 			network.add(showQueue);
+			bar.add(network);
 			JMenu about=new JMenu("About");
 			JMenuItem license=new JMenuItem("License");
 			license.addActionListener(n->{
@@ -409,15 +529,19 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	 * Inner classes
 	 */
 	private class SendQueue extends JFrame{
+		private JPanel display;
 		SendQueue(){
 			SwingUtilities.invokeLater(()->{
 				setTitle("Datagrams to be sent");
 				setDefaultCloseOperation(HIDE_ON_CLOSE);
 				setSize(600,600);
-				BoxLayout box=new BoxLayout(this,BoxLayout.Y_AXIS);
-				setLayout(box);
+				display=new JPanel();
+				BoxLayout layout=new BoxLayout(display,BoxLayout.Y_AXIS);
+				display.setLayout(layout);
+				add(new JScrollPane(display));
 			});
 		}
+		@SuppressWarnings("unused")
 		void put(SendDatagramEvent toBeSent,String description) {
 			JTextField field=new JTextField(socket.getLocalSocketAddress().toString()+"->"+toBeSent.remote().toString()+": "+description);
 			field.setEditable(false);
@@ -425,20 +549,28 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			JPopupMenu popup=new JPopupMenu();
 			JMenuItem delete=new JMenuItem("Delete");
 			delete.addActionListener(n->{
-				remove(pane);
+				display.remove(pane);
 				revalidate();
 				repaint();
+				display.revalidate();
+				display.repaint();
 			});
 			JMenuItem send=new JMenuItem("Send");
 			send.addActionListener(n->{
-				remove(pane);
+				display.remove(pane);
 				EDT.put(toBeSent);
 				if(displaySend) {
 					displayData(toBeSent.data(),socket.getLocalSocketAddress(),toBeSent.remote(),true);
 				}
 				revalidate();
 				repaint();
+				display.revalidate();
+				display.repaint();
 			});
+			JMenuItem show=new JMenuItem("Show Data Inside");
+			JTextArea text=new JTextArea(),hex=new JTextArea();
+			hex.setLineWrap(true);
+			
 			popup.add(delete);
 			popup.add(send);
 			field.addMouseListener(new MouseListener() {
@@ -461,14 +593,16 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				@Override
 				public void mouseExited(MouseEvent e) {}
 			});
-			add(pane);
+			display.add(pane);
 			if(isShowing()) {
 				revalidate();
 				repaint();
+				display.revalidate();
+				display.repaint();
 			}
 		}
 		boolean nonEmpty() {
-			return getComponents().length!=0;
+			return display.getComponents().length!=0;
 		}
 	}
 	private static enum OutOfLength{
