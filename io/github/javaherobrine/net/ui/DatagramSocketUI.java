@@ -508,15 +508,15 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		JTextArea hex=new JTextArea(),text=new JTextArea();
 		hex.setRows(5);
 		text.setRows(5);
-		hex.setText(Hex.toHex(data));
+		hex.setText(Hex.toHex(data,' '));
 		text.setText(new String(data));
 		text.addMouseListener(listener);
 		hex.addMouseListener(listener);
 		hex.setEditable(false);
 		text.setEditable(false);
-		inner.add(new JScrollPane(text));
-		inner.add(new JScrollPane(hex));
-		outer.add(inner,BorderLayout.SOUTH);
+		inner.add(text);
+		inner.add(hex);
+		outer.add(new JScrollPane(inner),BorderLayout.SOUTH);
 		SwingUtilities.invokeLater(()->{
 			display.add(outer);
 			revalidate();
@@ -530,6 +530,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	 */
 	private class SendQueue extends JFrame{
 		private JPanel display;
+		private DataDialog hexView=new DataDialog(this);
 		SendQueue(){
 			SwingUtilities.invokeLater(()->{
 				setTitle("Datagrams to be sent");
@@ -568,11 +569,13 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				display.repaint();
 			});
 			JMenuItem show=new JMenuItem("Show Data Inside");
-			JTextArea text=new JTextArea(),hex=new JTextArea();
-			hex.setLineWrap(true);
-			
+			show.addActionListener(n->{
+				hexView.setData(toBeSent.data());
+				hexView.setVisible(true);
+			});
 			popup.add(delete);
 			popup.add(send);
+			popup.add(show);
 			field.addMouseListener(new MouseListener() {
 				@Override
 				public void mouseClicked(MouseEvent e) {}
@@ -603,6 +606,50 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		}
 		boolean nonEmpty() {
 			return display.getComponents().length!=0;
+		}
+		@Override
+		public void dispose() {
+			hexView.dispose();
+			super.dispose();
+		}
+		private static class DataDialog extends JDialog{
+			private JTextArea text=new JTextArea(),hex=new JTextArea();
+			DataDialog(JFrame parent) {
+				super(parent,"View Data",true);
+				text.setColumns(60);
+				text.setRows(60);
+				hex.setColumns(60);
+				hex.setRows(60);
+				hex.setLineWrap(true);
+				CardLayout card=new CardLayout();
+				setLayout(card);
+				MouseListener listener=new MouseListener() {
+					@Override
+					public void mouseClicked(MouseEvent e) {}
+					@Override
+					public void mousePressed(MouseEvent e) {}
+					@Override
+					public void mouseReleased(MouseEvent e) {
+						if(e.getButton()==MouseEvent.BUTTON1) {
+							card.next(DataDialog.this.getContentPane());
+						}
+					}
+					@Override
+					public void mouseEntered(MouseEvent e) {}
+					@Override
+					public void mouseExited(MouseEvent e) {}
+				};
+				text.addMouseListener(listener);
+				hex.addMouseListener(listener);
+				add(new JScrollPane(text));
+				add(new JScrollPane(hex));
+				pack();
+				setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+			}
+			void setData(byte[] data){
+				text.setText(new String(data));
+				hex.setText(Hex.toHex(data, ' '));
+			}
 		}
 	}
 	private static enum OutOfLength{

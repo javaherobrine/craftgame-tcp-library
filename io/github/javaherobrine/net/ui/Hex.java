@@ -9,6 +9,15 @@ public class Hex {
 		}
 		return builder.toString();
 	}
+	public static String toHex(byte[] data,char delimiter) {
+		StringBuilder builder=new StringBuilder(data.length*3);
+		for(int i=0;i<data.length;++i) {
+			builder.append(CHARMAP[(data[i]&0xFF)>>4]);
+			builder.append(CHARMAP[data[i]&0xF]);
+			builder.append(delimiter);
+		}
+		return builder.toString();
+	}
 	public static byte[] getBytes(String str) {
 		byte[] block=new byte[str.length()>>1];
 		for(int i=0;i<block.length;++i) {

@@ -216,7 +216,15 @@ public class SocketUI extends JFrame implements Runnable{
 			author.addActionListener(n->{
 					JOptionPane.showMessageDialog(this,CREDITS,"Credits",JOptionPane.INFORMATION_MESSAGE);
 			});
-			help.add(author);
+			JMenuItem bugs=new JMenuItem("Bugs");
+			bugs.addActionListener(n->{
+				try {
+					InputStream in=SocketUI.class.getResourceAsStream("/BUGS");
+					String str=new String(in.readAllBytes());
+					in.close();
+					JOptionPane.showMessageDialog(this,str,"Bugs",JOptionPane.INFORMATION_MESSAGE);
+				} catch (IOException e) {}
+			});
 			JMenu data=new JMenu("Data");
 			JMenu trunc=new JMenu("Modify Blocking Policies");
 			JMenuItem trunc_now=new JMenuItem("Block on Every Byte");
@@ -480,7 +488,9 @@ public class SocketUI extends JFrame implements Runnable{
 			file.add(limit);
 			file.add(urg);
 			bar.add(file);
+			help.add(author);
 			help.add(license);
+			help.add(bugs);
 			bar.add(data);
 			bar.add(help);
 			setJMenuBar(bar);
@@ -648,14 +658,16 @@ public class SocketUI extends JFrame implements Runnable{
 				setJMenuBar(bar);
 			});
 		}
-		private void newLine() {
+		private int newLine() {
 			++line;
-			if(line==20) {
+			if(line==LINE) {
 				try {
 					line=0;
 					pane.getDocument().insertString(pane.getText().length(),"\n",null);
+					return 1;
 				} catch (BadLocationException e) {}
 			}
+			return 0;
 		}
 		public void insertSend(byte[] str) {
 			try {
@@ -664,7 +676,7 @@ public class SocketUI extends JFrame implements Runnable{
 					pane.getDocument().insertString(offset,Hex.toHex(str[i]),GREEN);
 					pane.getDocument().insertString(offset+2," ",GREEN);
 					offset+=3;
-					newLine();
+					offset+=newLine();
 				}
 			} catch (BadLocationException e) {} 
 		}
@@ -683,7 +695,7 @@ public class SocketUI extends JFrame implements Runnable{
 					pane.getDocument().insertString(offset,Hex.toHex(str[i]),RED);
 					pane.getDocument().insertString(offset+2," ",RED);
 					offset+=3;
-					newLine();
+					offset+=newLine();
 				}
 			} catch (BadLocationException e) {}
 		}

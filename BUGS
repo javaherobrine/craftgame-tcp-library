@@ -1,4 +1,9 @@
 Known bugs:
-1. AWT Thread Issues (issue #1)
-	-EDT in AWT & Swing won't terminate correctly sometimes if you use io.github.javaherobrine.net.ui.SocketUI
-	-Solution: kill this process when everything is done
+1. AWT Thread Issues (Issue #1)
+	- EDT in AWT & Swing won't terminate correctly sometimes if you use io.github.javaherobrine.net.ui.SocketUI
+	- Solution: kill this process when everything is done
+2. Hex View in io.github.javaherobrine.net.ui.DatagramSocketUI works incorrectly (Issue #2)
+	- Hex Content may overlap if it's too long
+	- Scroll Bar will control other components
+	- Solution: No
+If you meet a bug, you can open an issue in my GitHub repository, email javaherobrine@qq.com or even write a patch if you can!
