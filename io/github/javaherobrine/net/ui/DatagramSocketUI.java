@@ -9,6 +9,7 @@ import java.io.*;
 import java.util.*;
 import io.github.javaherobrine.*;
 import io.github.javaherobrine.net.*;
+import io.github.javaherobrine.net.speed.*;
 @SuppressWarnings("serial")
 public class DatagramSocketUI extends JFrame implements Runnable{
 	private byte[] currentData;
@@ -26,6 +27,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	private OutOfLength proc=OutOfLength.DISCARD;
 	private final Dimension SIZE=new Dimension(595,85);
 	private DataDialog dataView=new DataDialog(this);
+	private double sendLoss=0,recvLoss=0;
 	/*
 	 * They are all callbacks, too
 	 * Why is Java so Object-Oriented???
@@ -45,7 +47,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				case OutOfLength.DISCARD:
 					byte[] temp=new byte[MSS];
 					System.arraycopy(b,0,temp,0,MSS);
-					EDT.put(new SendDatagramEvent(socket,remote,b));
+					PacketLosser.sendAsync(new SendDatagramEvent(socket,remote,b),EDT,sendLoss);
 					b=temp;
 					if(displaySend) {
 						displayData(b,socket.getLocalSocketAddress(),remote,true);
@@ -54,7 +56,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				case OutOfLength.SEND:
 					SendDatagramEvent[] events=SendDatagramEvent.split(socket,remote,b, MSS);
 					for(int j=0;j<events.length;++j) {
-						EDT.put(events[j]);
+						PacketLosser.sendAsync(events[j],EDT,sendLoss);
 						if(displaySend) {
 							displayData(events[j].data(),socket.getLocalSocketAddress(),events[j].remote(),true);
 						}
@@ -62,7 +64,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					break;
 				case OutOfLength.QUEUE:
 					SendDatagramEvent[] events0=SendDatagramEvent.split(socket,remote,b,MSS);
-					EDT.put(events0[0]);
+					PacketLosser.sendAsync(events0[0],EDT,sendLoss);
 					if(displaySend) {
 						displayData(events0[0].data(),socket.getLocalSocketAddress(),events0[0].remote(),true);
 					}
@@ -72,7 +74,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					break;
 				}
 			}else {
-				EDT.put(new SendDatagramEvent(socket, remote, b));
+				PacketLosser.sendAsync(new SendDatagramEvent(socket,remote,b),EDT,sendLoss);
 				if(displaySend) {
 					displayData(b,socket.getLocalSocketAddress(),remote,true);
 				}
@@ -404,9 +406,66 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			size.addActionListener(n->{
 				sizeDialog.setVisible(true);
 			});
+			JMenuItem losser=new JMenuItem("Datagram Loss Emulator");
+			//Dialog begin
+			JDialog lDialog=new JDialog(this,"the RPM Package Manager",true);
+			JPanel lNorth=new JPanel();
+			lNorth.setLayout(new FlowLayout());
+			JPanel lSouth=new JPanel();
+			lSouth.setLayout(new FlowLayout());
+			lDialog.setLayout(new BorderLayout());
+			JTextField up=new JTextField("0");
+			JTextField down=new JTextField("0");
+			up.setColumns(8);
+			down.setColumns(8);
+			lNorth.add(new JLabel("P(Uplink\'s datagram loss)="));
+			lNorth.add(up);
+			lSouth.add(new JLabel("P(Downlink\'s datagram loss)="));
+			lSouth.add(down);
+			lDialog.add(lNorth,BorderLayout.NORTH);
+			lDialog.add(lSouth,BorderLayout.SOUTH);
+			lDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+			lDialog.addWindowListener(new WindowListener() {
+				@Override
+				public void windowOpened(WindowEvent e) {}
+				@Override
+				public void windowClosing(WindowEvent e) {
+					double uL=0,dL=0;
+					try {
+						uL=Double.parseDouble(up.getText());
+						dL=Double.parseDouble(down.getText());
+					}catch(NumberFormatException e1) {
+						JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+						return;
+					}
+					if(uL<0||dL<0||uL>1||dL>1) {
+						JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+						return;
+					}
+					sendLoss=uL;
+					recvLoss=dL;
+					lDialog.dispose();
+				}
+				@Override
+				public void windowClosed(WindowEvent e) {}
+				@Override
+				public void windowIconified(WindowEvent e) {}
+				@Override
+				public void windowDeiconified(WindowEvent e) {}
+				@Override
+				public void windowActivated(WindowEvent e) {}
+				@Override
+				public void windowDeactivated(WindowEvent e) {}
+			});
+			lDialog.pack();
+			//Dialog end
+			losser.addActionListener(n->{
+				lDialog.setVisible(true);
+			});
 			network.add(upload);
 			network.add(size);
 			network.add(showQueue);
+			network.add(losser);
 			bar.add(network);
 			JMenu about=new JMenu("About");
 			JMenuItem license=new JMenuItem("License");
@@ -463,7 +522,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		while(!socket.isClosed()) {
 			try {
 				DatagramPacket packet=new DatagramPacket(new byte[65528],65528);
-				socket.receive(packet);
+				PacketLosser.recv(socket,packet,recvLoss);
 				byte[] data=new byte[packet.getLength()];
 				System.arraycopy(packet.getData(),0,data,0,packet.getLength());
 				displayData(data,packet.getSocketAddress(),socket.getLocalSocketAddress(),false);
