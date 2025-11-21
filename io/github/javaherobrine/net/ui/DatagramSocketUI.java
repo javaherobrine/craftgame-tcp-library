@@ -24,6 +24,8 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	private int MSS=65507;
 	private boolean fail=false;
 	private OutOfLength proc=OutOfLength.DISCARD;
+	private final Dimension SIZE=new Dimension(595,85);
+	private DataDialog dataView=new DataDialog(this);
 	/*
 	 * They are all callbacks, too
 	 * Why is Java so Object-Oriented???
@@ -421,7 +423,17 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			author.addActionListener(n->{
 					JOptionPane.showMessageDialog(this,SocketUI.CREDITS,"Credits",JOptionPane.INFORMATION_MESSAGE);
 			});
+			JMenuItem bugs=new JMenuItem("Bugs");
+			bugs.addActionListener(n->{
+				try {
+					InputStream in=SocketUI.class.getResourceAsStream("/BUGS");
+					String str=new String(in.readAllBytes());
+					in.close();
+					JOptionPane.showMessageDialog(this,str,"Bugs",JOptionPane.INFORMATION_MESSAGE);
+				} catch (IOException e) {}
+			});
 			about.add(author);
+			about.add(bugs);
 			bar.add(about);
 			setJMenuBar(bar);
 			//menu done
@@ -432,8 +444,19 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			view.setViewportView(display);
 			add(panel,BorderLayout.SOUTH);
 			add(view,BorderLayout.CENTER);
+			setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 			setVisible(true);
 		});
+	}
+	@Override
+	public void dispose() {
+		super.dispose();
+		if(queue!=null) {
+			queue.dispose();
+		}
+		dataView.dispose();
+		socket.close();
+		EDT.interrupt();
 	}
 	@Override
 	public void run() {
@@ -447,10 +470,11 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			} catch (IOException e) {}
 		}
 	}
+	@SuppressWarnings("unused")
 	private void displayData(byte[] data,SocketAddress src,SocketAddress dst,boolean send) {
 		JPanel outer=new JPanel();
 		outer.setLayout(new BorderLayout());
-		outer.add(new JLabel(src.toString()+"->"+dst.toString()),BorderLayout.NORTH);
+		outer.add(new JLabel(src.toString()+"->"+dst.toString()+" Preview:"),BorderLayout.NORTH);
 		JPanel inner=new JPanel();
 		CardLayout card=new CardLayout();
 		inner.setLayout(card);
@@ -506,10 +530,22 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			popup.add(resend);
 		}
 		JTextArea hex=new JTextArea(),text=new JTextArea();
-		hex.setRows(5);
-		text.setRows(5);
-		hex.setText(Hex.toHex(data,' '));
-		text.setText(new String(data));
+		StringBuilder sb=new StringBuilder();
+		for(int i=0;i<data.length;++i) {
+			sb.append(Hex.toHex(data[i]));
+			sb.append(' ');
+			if(i%20==19) {
+				sb.append('\n');
+			}
+		};	
+		JMenuItem sd=new JMenuItem("Show Data");
+		sd.addActionListener(n->{
+			dataView.setData(data);
+			dataView.setVisible(true);
+		});
+		popup.add(sd);
+		hex.setPreferredSize(SIZE);
+		text.setPreferredSize(SIZE);
 		text.addMouseListener(listener);
 		hex.addMouseListener(listener);
 		hex.setEditable(false);
@@ -523,6 +559,8 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			repaint();
 			display.revalidate();
 			display.repaint();
+			hex.setText(sb.toString());
+			text.setText(new String(data));
 		});
 	}
 	/*
@@ -612,47 +650,54 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			hexView.dispose();
 			super.dispose();
 		}
-		private static class DataDialog extends JDialog{
-			private JTextArea text=new JTextArea(),hex=new JTextArea();
-			DataDialog(JFrame parent) {
-				super(parent,"View Data",true);
-				text.setColumns(60);
-				text.setRows(60);
-				hex.setColumns(60);
-				hex.setRows(60);
-				hex.setLineWrap(true);
-				CardLayout card=new CardLayout();
-				setLayout(card);
-				MouseListener listener=new MouseListener() {
-					@Override
-					public void mouseClicked(MouseEvent e) {}
-					@Override
-					public void mousePressed(MouseEvent e) {}
-					@Override
-					public void mouseReleased(MouseEvent e) {
-						if(e.getButton()==MouseEvent.BUTTON1) {
-							card.next(DataDialog.this.getContentPane());
-						}
-					}
-					@Override
-					public void mouseEntered(MouseEvent e) {}
-					@Override
-					public void mouseExited(MouseEvent e) {}
-				};
-				text.addMouseListener(listener);
-				hex.addMouseListener(listener);
-				add(new JScrollPane(text));
-				add(new JScrollPane(hex));
-				pack();
-				setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-			}
-			void setData(byte[] data){
-				text.setText(new String(data));
-				hex.setText(Hex.toHex(data, ' '));
-			}
-		}
 	}
 	private static enum OutOfLength{
 		DISCARD,SEND,QUEUE
+	}
+	private static class DataDialog extends JDialog{
+		private JTextArea text=new JTextArea(),hex=new JTextArea();
+		DataDialog(JFrame parent) {
+			super(parent,"View Data",true);
+			text.setColumns(60);
+			text.setRows(60);
+			hex.setColumns(60);
+			hex.setRows(60);
+			CardLayout card=new CardLayout();
+			setLayout(card);
+			MouseListener listener=new MouseListener() {
+				@Override
+				public void mouseClicked(MouseEvent e) {}
+				@Override
+				public void mousePressed(MouseEvent e) {}
+				@Override
+				public void mouseReleased(MouseEvent e) {
+					if(e.getButton()==MouseEvent.BUTTON1) {
+						card.next(DataDialog.this.getContentPane());
+					}
+				}
+				@Override
+				public void mouseEntered(MouseEvent e) {}
+				@Override
+				public void mouseExited(MouseEvent e) {}
+			};
+			text.addMouseListener(listener);
+			hex.addMouseListener(listener);
+			add(new JScrollPane(text));
+			add(new JScrollPane(hex));
+			pack();
+			setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+		}
+		void setData(byte[] data){
+			text.setText(new String(data));
+			StringBuilder sb=new StringBuilder();
+			for(int i=0;i<data.length;++i) {
+				sb.append(Hex.toHex(data[i]));
+				sb.append(' ');
+				if(i%20==19) {
+					sb.append('\n');
+				}
+			}
+			hex.setText(sb.toString());
+		}
 	}
 }
