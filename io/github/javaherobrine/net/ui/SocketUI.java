@@ -27,7 +27,7 @@ public class SocketUI extends JFrame implements Runnable{
 	private LimitedInputStream in;
 	private int currentValue;
 	private EventDispatchThread EDT;
-	private Blocker currentJudger=BLOCKED;
+	private volatile Blocker currentJudger=BLOCKED;
 	private Blocker lastJudger;
 	private final HexView viewHex=new HexView();
 	private final FixedLength FL_INSTANCE=new FixedLength();
@@ -63,7 +63,7 @@ public class SocketUI extends JFrame implements Runnable{
 	@SuppressWarnings("unused")
 	private static final Blocker ALLOW=new Blocker(false,false,i-> false);
 	@SuppressWarnings("unused")
-	private static final Blocker BLOCKED=new Blocker(true,false,i-> true);
+	private static final Blocker BLOCKED=new Blocker(true,false,i->{System.err.println("Hahaha");return true;});
 	private final Consumer<byte[]> PASS_RETURN_VALUE=block->{
 		passed=true;
 		HEX_TEMP=block;
@@ -131,9 +131,14 @@ public class SocketUI extends JFrame implements Runnable{
 				if(currentValue==-1) {
 					break;
 				}
+				boolean flag=false;
 				boolean result=currentJudger.test(currentValue);
 				if(currentJudger.bP()&&result) {
+					flag=true;
 					block();
+				}
+				if(flag) {//when the judger is modified
+					result=currentJudger.test(currentValue);
 				}
 				DISPLAY_IN_SCREEN.run();
 				TRANSFER_TO_FILE.run();
@@ -142,10 +147,10 @@ public class SocketUI extends JFrame implements Runnable{
 				}
 			}
 			EDT.interrupt();
-			show.append("\nstream closed");
+			setTitle("[Stream Closed]"+socket.toString());
 		}catch(IOException e) {
 			EDT.interrupt();
-			show.append("\nstream closed");
+			setTitle("[Stream Closed]"+socket.toString());
 		}
 	}
 	//GUI
@@ -343,11 +348,11 @@ public class SocketUI extends JFrame implements Runnable{
 					JTextField content=(JTextField)pane.getViewport().getComponent(0);
 					delimiter.delimiter(Hex.getBytes(content.getText()));
 				}
+				confirmed=true;
 				delimiter.build();
 				synchronized(SocketUI.this) {
 					currentJudger=new Blocker(false,true,delimiter::walk);
 				}
-				confirmed=true;
 				dDialog.dispose();
 			});
 			dCancel.addActionListener(n->{
@@ -399,6 +404,7 @@ public class SocketUI extends JFrame implements Runnable{
 			JMenuItem redirect=new JMenuItem("Redirect Data you received");
 			//Redirect Dialog
 			JDialog rDialog=new JDialog(this,"Data Redirect",true);
+			rDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 			rDialog.setLayout(new BorderLayout());
 			JCheckBox r2S=new JCheckBox("Display in screen"),r2F=new JCheckBox("Output to file");
 			JPanel rNorth=new JPanel(new FlowLayout());
