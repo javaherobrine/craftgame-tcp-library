@@ -60,6 +60,7 @@ public class SocketUI extends JFrame implements Runnable{
 	 * If I put this lambda expression in the parameter of callback, there will be tons of temporary objects.
 	 * They are all callbacks
 	 */
+	private boolean linewarp=false;
 	@SuppressWarnings("unused")
 	private static final Blocker ALLOW=new Blocker(false,false,i-> false);
 	@SuppressWarnings("unused")
@@ -170,7 +171,42 @@ public class SocketUI extends JFrame implements Runnable{
 			return;
 		}
 		SwingUtilities.invokeLater(()->{
-			input.setRows(4);
+			input.setRows(5);
+			//Input Menu
+			JPopupMenu ip=new JPopupMenu();
+			JMenuItem warp=new JMenuItem("Warp Lines");
+			warp.addActionListener(n->{
+				if(linewarp) {
+					warp.setText("Warp Lines");
+					input.setLineWrap(false);
+				}else {
+					warp.setText("Don't warp lines");
+					input.setLineWrap(true);
+				}
+				linewarp=!linewarp;
+			});
+			ip.add(warp);
+			input.addMouseListener(new MouseListener() {
+				@Override
+				public void mouseClicked(MouseEvent e) {}
+				@Override
+				public void mousePressed(MouseEvent e) {
+					if(e.isPopupTrigger()) {
+						ip.show(input,e.getX(),e.getY());
+					}
+				}
+				@Override
+				public void mouseReleased(MouseEvent e) {
+					if(e.isPopupTrigger()) {
+						ip.show(input,e.getX(),e.getY());
+					}
+				}
+				@Override
+				public void mouseEntered(MouseEvent e) {}
+				@Override
+				public void mouseExited(MouseEvent e) {}
+			});
+			//Menu done
 			JMenuBar bar=new JMenuBar();
 			JMenu file=new JMenu("Network");
 			JMenuItem upload=new JMenuItem("Upload");
@@ -289,6 +325,7 @@ public class SocketUI extends JFrame implements Runnable{
 			lS.add(Lcancel);
 			len.add(lS,BorderLayout.SOUTH);
 			len.pack();
+			len.setMinimumSize(len.getSize());
 			len.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 			//Dialog done
 			length.addActionListener(n->{
@@ -427,6 +464,7 @@ public class SocketUI extends JFrame implements Runnable{
 			rSouth.add(rA);
 			rDialog.add(rSouth,BorderLayout.SOUTH);
 			rDialog.pack();
+			rDialog.setMinimumSize(rDialog.getSize());
 			rDialog.addWindowListener(new WindowListener() {
 				@Override
 				public void windowOpened(WindowEvent e) {}
@@ -527,6 +565,7 @@ public class SocketUI extends JFrame implements Runnable{
 			add(panel,BorderLayout.CENTER);
 			add(send,BorderLayout.SOUTH);
 			setSize(600,600);
+			setMinimumSize(new Dimension(400,400));
 			addWindowListener(new WindowListener() {
 				@Override
 				public void windowOpened(WindowEvent e) {}
@@ -592,6 +631,10 @@ public class SocketUI extends JFrame implements Runnable{
 				upload.add(u1);
 				upload.add(unit);
 				JFormattedTextField u2=new JFormattedTextField();
+				u1.setColumns(10);
+				u2.setColumns(10);
+				((AbstractDocument)u1.getDocument()).setDocumentFilter(new HexInput.NumberFilter(10));
+				((AbstractDocument)u2.getDocument()).setDocumentFilter(new HexInput.NumberFilter(10));
 				u2.setValue(0L);
 				JPanel download=new JPanel();
 				download.add(d);
@@ -623,6 +666,7 @@ public class SocketUI extends JFrame implements Runnable{
 					public void windowDeactivated(WindowEvent e) {}
 				});
 				pack();
+				setMinimumSize(getSize());
 			});
 		}
 		public static void limit(LongConsumer u,LongConsumer d) {
@@ -650,7 +694,7 @@ public class SocketUI extends JFrame implements Runnable{
 				pane=new JTextPane();
 				pane.setEditable(false);
 				setSize(500,500);
-				setResizable(false);
+				setMinimumSize(new Dimension(500,300));
 				add(new JScrollPane(pane));
 				JMenuBar bar=new JMenuBar();
 				JMenu data=new JMenu("Data");

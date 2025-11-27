@@ -28,6 +28,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	private final Dimension SIZE=new Dimension(595,85);
 	private DataDialog dataView=new DataDialog(this);
 	private double sendLoss=0,recvLoss=0;
+	private boolean linewarp=false;
 	/*
 	 * They are all callbacks, too
 	 * Why is Java so Object-Oriented???
@@ -96,10 +97,45 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		EDT.start();
 		this.socket=socket;
 		SwingUtilities.invokeLater(()->{
+			setResizable(false);
+			JPopupMenu ip=new JPopupMenu();
+			JMenuItem warp=new JMenuItem("Warp Lines");
+			warp.addActionListener(n->{
+				if(linewarp) {
+					warp.setText("Warp Lines");
+					input.setLineWrap(false);
+				}else {
+					warp.setText("Don't warp lines");
+					input.setLineWrap(true);
+				}
+				linewarp=!linewarp;
+			});
+			ip.add(warp);
+			input.addMouseListener(new MouseListener() {
+				@Override
+				public void mouseClicked(MouseEvent e) {}
+				@Override
+				public void mousePressed(MouseEvent e) {
+					if(e.isPopupTrigger()) {
+						ip.show(input,e.getX(),e.getY());
+					}
+				}
+				@Override
+				public void mouseReleased(MouseEvent e) {
+					if(e.isPopupTrigger()) {
+						ip.show(input,e.getX(),e.getY());
+					}
+				}
+				@Override
+				public void mouseEntered(MouseEvent e) {}
+				@Override
+				public void mouseExited(MouseEvent e) {}
+			});
 			setSize(600,600);
 			setTitle("Datagram Socket, Local="+socket.getLocalSocketAddress());
 			BoxLayout layout=new BoxLayout(display,BoxLayout.Y_AXIS);
 			JScrollPane view=new JScrollPane(display);
+			JScrollBar vertical=view.getVerticalScrollBar();
 			display.setLayout(layout);
 			input.setRows(5);
 			//Dialogs
@@ -163,6 +199,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			send.addActionListener(n->{
 				SEND.accept(input.getText().getBytes());
 				input.setText("");
+				vertical.setValue(vertical.getMaximum());
 			});
 			bottom.add(send);
 			//Dialog done
@@ -612,7 +649,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		inner.add(text);
 		inner.add(hex);
 		outer.add(new JScrollPane(inner),BorderLayout.SOUTH);
-		SwingUtilities.invokeLater(()->{
+		if(SwingUtilities.isEventDispatchThread()) {
 			display.add(outer);
 			revalidate();
 			repaint();
@@ -620,7 +657,17 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			display.repaint();
 			hex.setText(sb.toString());
 			text.setText(new String(data));
-		});
+		}else {
+			SwingUtilities.invokeLater(()->{
+				display.add(outer);
+				revalidate();
+				repaint();
+				display.revalidate();
+				display.repaint();
+				hex.setText(sb.toString());
+				text.setText(new String(data));
+			});
+		}
 	}
 	/*
 	 * Inner classes
