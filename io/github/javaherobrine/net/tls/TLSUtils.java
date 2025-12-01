@@ -1,4 +1,4 @@
-package io.github.javaherobrine.net;
+package io.github.javaherobrine.net.tls;
 import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
@@ -36,5 +36,11 @@ public class TLSUtils {
 			}
 		},new SecureRandom());
 		return ssl;
+	}
+	public static SSLSocket proxiedTLS(SSLSocketFactory factory,Proxy proxy,SocketAddress remote) throws IOException{
+		Socket underlying=new Socket(proxy);
+		underlying.connect(remote);
+		InetSocketAddress proxyT=(InetSocketAddress)proxy.address();
+		return (SSLSocket)factory.createSocket(underlying, proxyT.getHostString(),proxyT.getPort(), true);
 	}
 }
