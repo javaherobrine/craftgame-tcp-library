@@ -8,6 +8,7 @@ import java.net.*;
 import java.io.*;
 import java.util.*;
 import io.github.javaherobrine.*;
+import io.github.javaherobrine.EventDispatchThread;
 import io.github.javaherobrine.net.*;
 import io.github.javaherobrine.net.speed.*;
 @SuppressWarnings("serial")
@@ -134,7 +135,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			setSize(600,600);
 			setTitle("Datagram Socket, Local="+socket.getLocalSocketAddress());
 			BoxLayout layout=new BoxLayout(display,BoxLayout.Y_AXIS);
-			JScrollPane view=new JScrollPane(display);
+			JScrollPane view=new JScrollPane(display, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 			JScrollBar vertical=view.getVerticalScrollBar();
 			display.setLayout(layout);
 			input.setRows(5);
@@ -385,7 +386,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					try {
 						int i=Integer.parseInt(sField.getText());
 						if(i>65507) {
-							JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must be less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
 							return;
 						}else if(i==0) {
 							JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size = 0?","Illegal Input",JOptionPane.ERROR_MESSAGE);
@@ -535,7 +536,9 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			//menu done
 			JPanel panel=new JPanel(new BorderLayout());
 			panel.add(bottom,BorderLayout.SOUTH);
-			panel.add(new JScrollPane(input),BorderLayout.NORTH);
+			JScrollPane inputScroll=new JScrollPane(input, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+			panel.add(inputScroll,BorderLayout.NORTH);
+            
 			setLayout(new BorderLayout());
 			view.setViewportView(display);
 			add(panel,BorderLayout.SOUTH);
