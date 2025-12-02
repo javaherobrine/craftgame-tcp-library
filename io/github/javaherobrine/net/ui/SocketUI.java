@@ -6,10 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.SimpleAttributeSet;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.AbstractDocument;
+import javax.swing.text.*;
 import java.util.function.*;
 import java.util.stream.*;
 import io.github.javaherobrine.net.speed.*;
@@ -64,7 +61,7 @@ public class SocketUI extends JFrame implements Runnable{
 	@SuppressWarnings("unused")
 	private static final Blocker ALLOW=new Blocker(false,false,i-> false);
 	@SuppressWarnings("unused")
-	private static final Blocker BLOCKED=new Blocker(true,false,i->{System.err.println("Hahaha");return true;});
+	private static final Blocker BLOCKED=new Blocker(true,false,i->true);
 	private final Consumer<byte[]> PASS_RETURN_VALUE=block->{
 		passed=true;
 		HEX_TEMP=block;
@@ -681,8 +678,10 @@ public class SocketUI extends JFrame implements Runnable{
 	private static class HexView extends JFrame{
 		public static final int LINE=20;
 		private int line=0;
+		private StringBuilder sb=new StringBuilder();
 		private static final long serialVersionUID = 1L;
 		private JTextPane pane;
+		private static final String LF=System.lineSeparator();
 		private static final SimpleAttributeSet RED=new SimpleAttributeSet(),BLUE=new SimpleAttributeSet(),GREEN=new SimpleAttributeSet();
 		@SuppressWarnings("unused")
 		public HexView() {
@@ -702,51 +701,48 @@ public class SocketUI extends JFrame implements Runnable{
 				setDefaultCloseOperation(HIDE_ON_CLOSE);
 				cls.addActionListener(n->{
 					pane.setText("");
+					line=0;
 				});
 				data.add(cls);
 				bar.add(data);
 				setJMenuBar(bar);
 			});
 		}
-		private int newLine() {
+		private String construct(byte[] data) {
+			for(byte b:data) {
+				sb.append(Hex.toHex(b));
+				sb.append(' ');
+				newLine();
+			}
+			String str=sb.toString();
+			sb.setLength(0);
+			return str;
+		}
+		private void newLine() {
 			++line;
 			if(line==LINE) {
-				try {
-					line=0;
-					pane.getDocument().insertString(pane.getText().length(),"\n",null);
-					return 1;
-				} catch (BadLocationException e) {}
+				line=0;
+				sb.append(LF);
 			}
-			return 0;
 		}
 		public void insertSend(byte[] str) {
 			try {
-				int offset=pane.getText().length();
-				for(int i=0;i<str.length;++i) {
-					pane.getDocument().insertString(offset,Hex.toHex(str[i]),GREEN);
-					pane.getDocument().insertString(offset+2," ",GREEN);
-					offset+=3;
-					offset+=newLine();
-				}
-			} catch (BadLocationException e) {} 
+				Document doc=pane.getDocument();
+				doc.insertString(doc.getLength(),construct(str), GREEN);
+			} catch (BadLocationException e) {
+				e.printStackTrace();
+			} 
 		}
 		public void insertRecv(int str) {
 			try {
-				int offset=pane.getText().length();
-				pane.getDocument().insertString(offset, Hex.toHex((byte)str), BLUE);
-				pane.getDocument().insertString(offset+2, " ", BLUE);
+				Document doc=pane.getDocument();
+				doc.insertString(doc.getLength(),construct(new byte[] {(byte)str}), BLUE);
 			} catch (BadLocationException e) {}
-			newLine();
 		}
 		public void insertURG(byte[] str) {
 			try {
-				int offset=pane.getText().length();
-				for(int i=0;i<str.length;++i) {
-					pane.getDocument().insertString(offset,Hex.toHex(str[i]),RED);
-					pane.getDocument().insertString(offset+2," ",RED);
-					offset+=3;
-					offset+=newLine();
-				}
+				Document doc=pane.getDocument();
+				doc.insertString(doc.getLength(),construct(str), RED);
 			} catch (BadLocationException e) {}
 		}
 	}
