@@ -34,14 +34,38 @@ public class SocketUI extends JFrame implements Runnable{
 	private boolean nSend=false;//don't display send in the screen
 	private boolean confirmed=false;//whether the dialog is confirmed
 	private boolean blocked=false;
+	private boolean inputShutdown=false;
+	private boolean outputShutdown=false;
 	private boolean lastBlocked;
-	private String TITLE;
-	private String TITLE_BLOCKED;
+	private final String TITLE;
+	private final String TITLE_BLOCKED;
+	private final String TITLE_INPUT_SHUTDOWN;
+	private final String TITLE_OUTPUT_SHUTDOWN;
+	private final String TITLE_OUTPUT_SHUTDOWN_BLOCKED;
+	private final String TITLE_CLOSED;
 	private byte[] HEX_TEMP;
 	private boolean passed;
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
+	private JMenu trunc=new JMenu("Modify Blocking Policies");
+	private JMenuItem distrunc=new JMenuItem("Resume the stream");
+	private JMenuItem redirect=new JMenuItem("Redirect Data you received");
+	private JMenuItem upload=new JMenuItem("Upload");
+	private JMenuItem si=new JMenuItem("Shutdown Input");
+	private JMenuItem sh=new JMenuItem("Hide data you sent");
+	private JMenuItem sendBinary=new JMenuItem("Send Binary Data");
+	private JMenuItem urg=new JMenuItem("Send Urgent Data");
+	private JMenuItem so=new JMenuItem("Shutdown Output");
+	private JButton send=new JButton("Send");
+	private JMenuItem close=new JMenuItem("Disconnect");
+	private JMenu file=new JMenu("Network");
+	public Runnable onClose=()->{};
+	/**
+	 * Must be specifically annotated
+	 * It should be used to indicate this window is closed and the related resources is released
+	 * And EDT is supposed to terminate now
+	 */
 	public static final String CREDITS="""
 		Programming:
 			Java_Herobrine from CraftGame Studio
@@ -152,13 +176,21 @@ public class SocketUI extends JFrame implements Runnable{
 		}
 	}
 	//GUI
+	public SocketUI(Socket s) {
+		this(s,()->{System.exit(0);});
+	}
 	@SuppressWarnings("unused")
-	public SocketUI(Socket soc) {
+	public SocketUI(Socket soc,Runnable r) {
 		EDT=new EventDispatchThread();
 		EDT.start();
 		socket=soc;
 		TITLE=socket.toString();
-		TITLE_BLOCKED="[Stream Blocked]"+TITLE;
+		TITLE_BLOCKED="[Input Blocked]"+TITLE;
+		TITLE_OUTPUT_SHUTDOWN="[Output Shutdown]"+TITLE;
+		TITLE_INPUT_SHUTDOWN="[Input Shutdown]"+TITLE;
+		TITLE_OUTPUT_SHUTDOWN_BLOCKED="[Input Blocked]"+TITLE_OUTPUT_SHUTDOWN;
+		TITLE_CLOSED="[Connection Closed]"+TITLE;
+		onClose=r;
 		try {
 			in=new LimitedInputStream(soc.getInputStream());
 			out=new LimitedOutputStream(soc.getOutputStream());
@@ -205,8 +237,6 @@ public class SocketUI extends JFrame implements Runnable{
 			});
 			//Menu done
 			JMenuBar bar=new JMenuBar();
-			JMenu file=new JMenu("Network");
-			JMenuItem upload=new JMenuItem("Upload");
 			upload.addActionListener(m->{
 				if(CHOOSER.showDialog(this, "Upload")==0) {
 					try {
@@ -222,13 +252,6 @@ public class SocketUI extends JFrame implements Runnable{
 					}catch (Exception e) {}
 				}
 			});
-			JMenuItem close=new JMenuItem("Disconnect");
-			close.addActionListener(n->{
-				try {
-					socket.close();
-				}catch (Exception e) {}
-			});
-			JMenuItem sendBinary=new JMenuItem("Send Binary Data");
 			sendBinary.addActionListener(n->{
 				HexInput.input(SEND_HEX);
 			});
@@ -236,7 +259,6 @@ public class SocketUI extends JFrame implements Runnable{
 			limit.addActionListener(n->{
 				SpeedInput.limit(LIMIT_UP, LIMIT_DOWN);
 			});
-			JMenuItem urg=new JMenuItem("Send Urgent Data");
 			urg.addActionListener(n->{
 				HexInput.input(SEND_URG);
 			});
@@ -264,7 +286,6 @@ public class SocketUI extends JFrame implements Runnable{
 				} catch (IOException e) {}
 			});
 			JMenu data=new JMenu("Data");
-			JMenu trunc=new JMenu("Modify Blocking Policies");
 			JMenuItem trunc_now=new JMenuItem("Block on Every Byte");
 			JMenuItem nonBlock=new JMenuItem("Don't Block the Stream");
 			JMenuItem length=new JMenuItem("Block after a fixed length");
@@ -411,9 +432,7 @@ public class SocketUI extends JFrame implements Runnable{
 					resumeBlocker();
 				}
 			});
-			JMenuItem distrunc=new JMenuItem("Resume the stream");
 			JMenuItem clear=new JMenuItem("Clear Screen");
-			JMenuItem sh=new JMenuItem("Hide data you sent");
 			sh.addActionListener(n->{
 				if(nSend) {
 					sh.setText("Hide data you sent");
@@ -435,7 +454,6 @@ public class SocketUI extends JFrame implements Runnable{
 					SocketUI.this.notifyAll();
 				}
 			});
-			JMenuItem redirect=new JMenuItem("Redirect Data you received");
 			//Redirect Dialog
 			JDialog rDialog=new JDialog(this,"Data Redirect",true);
 			rDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
@@ -513,6 +531,25 @@ public class SocketUI extends JFrame implements Runnable{
 			redirect.addActionListener(n->{
 				rDialog.setVisible(true);
 			});
+			so.addActionListener(n->{
+				shutdownOutput();
+				try {
+					socket.shutdownOutput();
+				} catch (IOException e1) {}
+			});
+			close.addActionListener(n->{
+				shutdownOutput();
+				shutdownInput();
+				try {
+					socket.close();
+				}catch (Exception e) {}
+			});
+			si.addActionListener(n->{
+				shutdownInput();
+				try {
+					socket.shutdownInput();
+				} catch (IOException e1) {}
+			});
 			trunc.add(trunc_now);
 			trunc.add(nonBlock);
 			trunc.add(length);
@@ -525,6 +562,8 @@ public class SocketUI extends JFrame implements Runnable{
 			data.add(redirect);
 			file.add(upload);
 			file.add(close);
+			file.add(so);
+			file.add(si);
 			file.add(sendBinary);
 			file.add(limit);
 			file.add(urg);
@@ -538,7 +577,6 @@ public class SocketUI extends JFrame implements Runnable{
 			JPanel panel=new JPanel();
 			panel.setLayout(new BorderLayout());
 			show.setEditable(false);
-			JButton send=new JButton("Send");
 			JScrollPane scroll0=new JScrollPane();
 			scroll0.getViewport().setOpaque(false);
 			scroll0.setViewportView(show);
@@ -579,7 +617,7 @@ public class SocketUI extends JFrame implements Runnable{
 				public void windowClosed(WindowEvent e) {
 					viewHex.dispose();
 					HexInput.INSTANCE.dispose();
-					Stream.of(JFrame.getWindows()).forEach(frame->frame.dispose());
+					Stream.of(Window.getWindows()).forEach(Window::dispose);
 					Stream.of(JFrame.getWindows()).forEach(System.err::println);
 					System.err.println();
 					Stream.of(JFrame.getOwnerlessWindows()).forEach(System.err::println);
@@ -589,7 +627,7 @@ public class SocketUI extends JFrame implements Runnable{
 							System.err.println(" "+v[i]);
 						}
 					});
-					//Bug: EDT in AWT & Swing won't terminate correctly
+					onClose.run();
 				}
 				@Override
 				public void windowIconified(WindowEvent e) {}
@@ -812,5 +850,49 @@ public class SocketUI extends JFrame implements Runnable{
 				SocketUI.this.notifyAll();
 			}
 		}
+	}
+	public void shutdownInput() {
+		if(inputShutdown) {
+			return;
+		}
+		inputShutdown=true;
+		currentJudger=ALLOW;
+		if(blocked) {
+			synchronized(this) {
+				notifyAll();
+			}
+		}
+		SwingUtilities.invokeLater(()->{
+			if(outputShutdown) {
+				file.setEnabled(false);
+				close.setEnabled(false);
+			}
+			setTitle(outputShutdown?TITLE_CLOSED:TITLE_INPUT_SHUTDOWN);
+			si.setEnabled(false);
+			trunc.setEnabled(false);
+			redirect.setEnabled(false);
+			distrunc.setEnabled(false);
+		});
+	}
+	public void shutdownOutput() {
+		if(outputShutdown) {
+			return;
+		}
+		outputShutdown=true;
+		SwingUtilities.invokeLater(()->{
+			if(inputShutdown) {
+				file.setEnabled(false);
+				close.setEnabled(false);
+			}
+			setTitle(inputShutdown?TITLE_CLOSED:(blocked?TITLE_OUTPUT_SHUTDOWN_BLOCKED:TITLE_OUTPUT_SHUTDOWN));
+			upload.setEnabled(false);
+			sendBinary.setEnabled(false);
+			urg.setEnabled(false);
+			input.setText("");
+			input.setEditable(false);
+			send.setEnabled(false);
+			so.setEnabled(false);
+			sh.setEnabled(false);
+		});
 	}
 }

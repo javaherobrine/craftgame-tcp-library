@@ -5,6 +5,23 @@ import java.net.*;
 import java.security.*;
 import java.security.cert.*;
 public class TLSUtils {
+	/**
+	 * It's dangerous!!!
+	 */
+	@Deprecated(forRemoval=false)
+	public static final TrustManager[] TRUST_ALL=new TrustManager[] {
+		new X509TrustManager() {
+			@Override
+			public void checkClientTrusted(X509Certificate[] c,String s) {}
+			@Override
+			public void checkServerTrusted(X509Certificate[] c,String s) {}
+			@Override
+			public X509Certificate[] getAcceptedIssuers() {
+				return null;
+			}
+		}
+	};
+	public static final KeyManager[] NO_KEY=null;
 	public static Socket defaultSSLSocket(String host,int port) throws IOException {
    return SSLSocketFactory.getDefault().createSocket(host,port);
 	}
@@ -21,20 +38,13 @@ public class TLSUtils {
 		context.init(km.getKeyManagers(),tmf.getTrustManagers(),null);
 		return context;
 	}
+	/**
+	 * It's dangerous!!!
+	 */
 	@Deprecated
 	public static SSLContext trustAllCert() throws KeyManagementException, NoSuchAlgorithmException {//man in middle is a problem
 		SSLContext ssl=SSLContext.getInstance("SSL");
-		ssl.init(null,new TrustManager[] {new X509TrustManager() {
-				@Override
-				public void checkClientTrusted(X509Certificate[] c,String s) {}
-				@Override
-				public void checkServerTrusted(X509Certificate[] c,String s) {}
-				@Override
-				public X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
-			}
-		},new SecureRandom());
+		ssl.init(NO_KEY,TRUST_ALL,new SecureRandom());
 		return ssl;
 	}
 	public static SSLSocket proxiedTLS(SSLSocketFactory factory,Proxy proxy,SocketAddress remote) throws IOException{
@@ -42,5 +52,23 @@ public class TLSUtils {
 		underlying.connect(remote);
 		InetSocketAddress proxyT=(InetSocketAddress)proxy.address();
 		return (SSLSocket)factory.createSocket(underlying, proxyT.getHostString(),proxyT.getPort(), true);
+	}
+	public static TrustManager[] trust(String file,char[] pwd) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+		KeyStore keystore=KeyStore.getInstance(KeyStore.getDefaultType());
+		InputStream in=new FileInputStream(file);
+		keystore.load(in, pwd);
+		in.close();
+		TrustManagerFactory tmf=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+		tmf.init(keystore);
+		return tmf.getTrustManagers();
+	}
+	public static KeyManager[] key(String file,char[] pwd) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException {
+		KeyStore keystore=KeyStore.getInstance(KeyStore.getDefaultType());
+		InputStream in=new FileInputStream(file);
+		keystore.load(in, pwd);
+		in.close();
+		KeyManagerFactory tmf=KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+		tmf.init(keystore,pwd);
+		return tmf.getKeyManagers();
 	}
 }

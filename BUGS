@@ -1,8 +1,5 @@
 Known bugs:
-1. AWT Thread Issues (Issue #1)
-	- EDT in AWT & Swing won't terminate correctly sometimes if you use io.github.javaherobrine.net.ui.SocketUI
-	- Solution: kill this process when everything is done
-2. No Unicode support in io.github.javaherobrine.net.ui.SocketUI (Issue #5)
+1. No Unicode support in io.github.javaherobrine.net.ui.SocketUI (Issue #5)
  	- Unicode characters will be split into many wrong ASCII characters and displayed wrongly in the screen
  	- Solution: store them in a file and use text editors
 If you meet a bug, you can open an issue in my GitHub repository, email javaherobrine@qq.com or even write a patch if you can!
