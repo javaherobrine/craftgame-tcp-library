@@ -169,10 +169,10 @@ public class SocketUI extends JFrame implements Runnable{
 				}
 			}
 			EDT.interrupt();
-			setTitle("[Stream Closed]"+socket.toString());
+			shutdownInput();
 		}catch(IOException e) {
 			EDT.interrupt();
-			setTitle("[Stream Closed]"+socket.toString());
+			shutdownInput();
 		}
 	}
 	//GUI
@@ -819,6 +819,31 @@ public class SocketUI extends JFrame implements Runnable{
 		}
 		public boolean bP() {
 			return bP;
+		}
+	}
+	private class OutputEvent extends io.github.javaherobrine.net.OutputEvent{
+		public OutputEvent(OutputStream out, byte[] data, int offset, int length) {
+			super(out, data, offset, length);
+		}
+		public OutputEvent(OutputStream out, byte[] data) {
+			super(out, data);
+		}
+		public OutputEvent(OutputStream out, int data) {
+			super(out, data);
+		}
+		@Override
+		public void exception(Throwable except) throws Exception {
+			shutdownOutput();
+		}
+	}
+	private class InputTransferEvent extends io.github.javaherobrine.net.InputTransferEvent{
+		public InputTransferEvent(InputStream i, OutputStream o) {
+			super(i, o);
+		}
+		@Override
+		public void exception(Throwable t) throws Exception {
+			super.exception(t);
+			shutdownOutput();
 		}
 	}
 	//Classes done, Functions now
