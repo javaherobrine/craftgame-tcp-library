@@ -4,7 +4,7 @@ import java.io.*;
 /**
  * The TCP client, with handshake and protocol switching
  */
-public abstract class Client extends AbstractClient{
+public abstract class Client extends Thread implements AbstractClient{
 	protected Socket client;
 	protected Protocol protocol;
 	protected boolean disconnected=false;
@@ -39,7 +39,7 @@ public abstract class Client extends AbstractClient{
 	public void send(EventContent c) throws IOException {
 		protocol.send(c);
 	}
-	protected EventContent recv() {
+	public EventContent recv() {
 		return protocol.next();
 	}
 	@Override

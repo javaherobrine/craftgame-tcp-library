@@ -23,6 +23,6 @@ public abstract class EventContent extends AbstractEvent implements Serializable
 	}
 	@Override
 	public void process() throws Exception{
-		recvExec(recver instanceof ServerSideClient);
+		recvExec(recver instanceof AbstractServerSideClient);
 	}
 }

@@ -2,11 +2,11 @@ package io.github.javaherobrine.net;
 import java.net.*;
 import java.io.*;
 import io.github.javaherobrine.*;
-public abstract class ServerSideClient extends Client{
+public abstract class ServerSideClient<T> extends Client implements AbstractServerSideClient{
 	private EventDispatchThread EDT;
-	public String player;
-	public Server s;
-	protected ServerSideClient(Socket sc,Server server,EventDispatchThread handle) throws IOException {
+	public T player;
+	public Server<T> s;
+	protected ServerSideClient(Socket sc,Server<T> server,EventDispatchThread handle) throws IOException {
 		super(sc);
 		s=server;
 		EDT=handle;

@@ -3,15 +3,15 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import io.github.javaherobrine.*;
-public abstract class Server extends Thread implements Closeable{
+public abstract class Server<T> extends Thread implements Closeable{
 	private ServerSocket server;
-	private Map<String,ServerSideClient> connected=new HashMap<String,ServerSideClient>();
+	private Map<T,ServerSideClient> connected=new HashMap<T,ServerSideClient>();
 	EventDispatchThread EDT=new EventDispatchThread();
 	public Server(int port) throws IOException {
 		server=new ServerSocket(port);
 		start();
 	}
-	public Client removeClient(String name) {
+	public Client removeClient(T name) {
 		synchronized(connected) {
 			return connected.remove(name);
 		}
@@ -48,7 +48,7 @@ public abstract class Server extends Thread implements Closeable{
 			connected.clear();
 		}
 	}
-	public Client getClient(String player) {
+	public Client getClient(T player) {
 		synchronized(connected) {
 			return connected.get(player);
 		}
