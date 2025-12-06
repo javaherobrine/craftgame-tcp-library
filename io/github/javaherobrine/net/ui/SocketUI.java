@@ -420,6 +420,7 @@ public class SocketUI extends JFrame implements Runnable{
 			dDialog.add(dS,BorderLayout.SOUTH);
 			dDialog.add(dM,BorderLayout.CENTER);
 			dDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+			dDialog.setMinimumSize(new Dimension(400,300));
 			//Dialog done
 			del.addActionListener(n->{
 				delimiter=new Delimiter();
@@ -459,6 +460,7 @@ public class SocketUI extends JFrame implements Runnable{
 			rDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 			rDialog.setLayout(new BorderLayout());
 			JCheckBox r2S=new JCheckBox("Display in screen"),r2F=new JCheckBox("Output to file");
+			r2S.setSelected(true);
 			JPanel rNorth=new JPanel(new FlowLayout());
 			rNorth.add(r2F);
 			rNorth.add(r2S);

@@ -47,11 +47,22 @@ public class TLSUtils {
 		ssl.init(NO_KEY,TRUST_ALL,new SecureRandom());
 		return ssl;
 	}
+	/**
+	 * It's dangerous!!!
+	 */
+	@Deprecated
+	public static SSLContext trustAllCert(String version) throws KeyManagementException, NoSuchAlgorithmException {//man in middle is a problem
+		SSLContext ssl=SSLContext.getInstance(version);
+		ssl.init(NO_KEY,TRUST_ALL,new SecureRandom());
+		return ssl;
+	}
 	public static SSLSocket proxiedTLS(SSLSocketFactory factory,Proxy proxy,SocketAddress remote) throws IOException{
 		Socket underlying=new Socket(proxy);
 		underlying.connect(remote);
 		InetSocketAddress proxyT=(InetSocketAddress)proxy.address();
-		return (SSLSocket)factory.createSocket(underlying, proxyT.getHostString(),proxyT.getPort(), true);
+		if(proxy!=Proxy.NO_PROXY)
+			return (SSLSocket)factory.createSocket(underlying, proxyT.getHostString(),proxyT.getPort(), true);
+		return (SSLSocket)factory.createSocket(underlying, ((InetSocketAddress)remote).getHostString(),((InetSocketAddress)remote).getPort(), true);
 	}
 	public static TrustManager[] trust(String file,char[] pwd) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
 		KeyStore keystore=KeyStore.getInstance(KeyStore.getDefaultType());

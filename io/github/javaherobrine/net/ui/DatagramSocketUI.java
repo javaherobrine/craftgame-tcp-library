@@ -7,7 +7,6 @@ import java.awt.event.*;
 import java.net.*;
 import java.io.*;
 import java.util.*;
-import io.github.javaherobrine.*;
 import io.github.javaherobrine.EventDispatchThread;
 import io.github.javaherobrine.net.*;
 import io.github.javaherobrine.net.speed.*;
@@ -92,9 +91,14 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		}
 		fail=false;
 	};
+	public Runnable run;
 	// Callback done
-	@SuppressWarnings("unused")
 	public DatagramSocketUI(DatagramSocket socket) {
+		this(socket,()->System.exit(0));
+	}
+	@SuppressWarnings("unused")
+	public DatagramSocketUI(DatagramSocket socket,Runnable onClose) {
+		this.run=onClose;
 		EDT.start();
 		this.socket=socket;
 		SwingUtilities.invokeLater(()->{
@@ -185,6 +189,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			choose.add(cNorth,BorderLayout.NORTH);
 			choose.add(cSouth,BorderLayout.SOUTH);
 			choose.pack();
+			choose.setMinimumSize(choose.getSize());
 			JPanel bottom=new JPanel();
 			bottom.setLayout(new FlowLayout());
 			bottom.add(new JLabel("Remote Host="));
@@ -205,13 +210,14 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			bottom.add(send);
 			//Dialog done
 			//menus
+			JMenu network=new JMenu("Network");
 			JMenuBar bar=new JMenuBar();
 			//Process Multicast DatagramSocket
 			if(socket instanceof MulticastSocket multi) {
 				try {
 					multi.setBroadcast(true);
 					JMenu multicast=new JMenu("Multicast");
-					JMenuItem inter=new JMenuItem("Multicast Configurations");
+					JMenuItem inter=new JMenuItem("Multicast Send Configurations");
 					JComboBox<String> interfaces=new JComboBox<>();
 					ArrayList<NetworkInterface> iList=new ArrayList<>();
 					NetworkInterface.networkInterfaces().forEach(i->{
@@ -220,8 +226,9 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					});
 					interfaces.setSelectedIndex(0);
 					//Dialog begin
-					JDialog selectInterface=new JDialog(this,"Select Interface",true);
-					selectInterface.setLayout(new BoxLayout(this,BoxLayout.Y_AXIS));
+					JDialog selectInterface=new JDialog(this,"Configurations",true);
+					BoxLayout b=new BoxLayout(selectInterface.getContentPane(),BoxLayout.Y_AXIS);
+					selectInterface.setLayout(b);
 					JPanel interf=new JPanel();
 					interf.setLayout(new FlowLayout());
 					interf.add(new JLabel("Interface="));
@@ -272,9 +279,109 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						@Override
 						public void windowDeactivated(WindowEvent e) {}			
 					});
+					selectInterface.pack();
+					selectInterface.setMinimumSize(selectInterface.getSize());
 					//Dialog done
 					inter.addActionListener(n->{
 						selectInterface.setVisible(true);
+					});
+					JMenuItem group=new JMenuItem("Multicast Group Configurations");
+					//Dialog begin
+					JDialog conf=new JDialog(this,"Multicast Groups",true);
+					conf.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+					conf.setSize(600,600);
+					conf.setLayout(new BorderLayout());
+					JButton addGroup=new JButton("Join Multicast Group");
+					conf.add(addGroup,BorderLayout.SOUTH);
+					JPanel groupPane=new JPanel();
+					BoxLayout box=new BoxLayout(groupPane,BoxLayout.Y_AXIS);
+					groupPane.setLayout(box);
+					conf.add(groupPane,BorderLayout.CENTER);
+					conf.setMinimumSize(new Dimension(400,100));
+					//Dialog begin
+					JDialog silver=new JDialog(conf,"Join Group",true);//Ag actually
+					JComboBox<String> silverI=new JComboBox<>();
+					NetworkInterface.networkInterfaces().forEach(i->{
+						silverI.addItem(i.getName());
+					});
+					JButton sOK=new JButton("OK");
+					JButton sCancel=new JButton("Cancel");
+					BoxLayout sBox=new BoxLayout(silver.getContentPane(),BoxLayout.Y_AXIS);
+					silver.setLayout(sBox);
+					silver.setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+					JTextField sIP=new JTextField();
+					sIP.setColumns(15);
+					JPanel sPanel0=new JPanel(new FlowLayout(FlowLayout.LEFT));
+					sPanel0.add(new JLabel("Multicast IP: "));
+					sPanel0.add(sIP);
+					silver.add(sPanel0);
+					JPanel sPanel1=new JPanel(new FlowLayout(FlowLayout.LEFT));
+					sPanel1.add(new JLabel("Multicast Interface: "));
+					sPanel1.add(silverI);
+					silver.add(sPanel1);
+					JPanel sPanel2=new JPanel(new FlowLayout());
+					sPanel2.add(sOK);
+					sPanel2.add(sCancel);
+					silver.add(sPanel2);
+					silver.pack();
+					silver.setMinimumSize(silver.getSize());
+					sCancel.addActionListener(n->{
+						silver.dispose();
+					});
+					sOK.addActionListener(n->{
+						InetAddress IP;
+						NetworkInterface interfa;
+						try {
+							IP=InetAddress.getByName(sIP.getText());
+							interfa=iList.get(silverI.getSelectedIndex());
+							multi.joinGroup(new InetSocketAddress(IP,0), interfa);
+						} catch (IOException e1) {
+							JOptionPane.showMessageDialog(silver,"Illegal Input","Can\'t join that group, or invalid multicast IP",JOptionPane.ERROR_MESSAGE);
+							return;
+						}
+						JLabel grp=new JLabel("Interface: "+interfa.getName()+", Multicast Group: "+IP.getHostAddress());
+						JPopupMenu gPopup=new JPopupMenu();
+						JMenuItem gLeave=new JMenuItem("Leave");
+						gLeave.addActionListener(n0->{
+							try {
+								multi.leaveGroup(new InetSocketAddress(IP,0),interfa);
+							} catch (IOException e1) {}
+							groupPane.remove(grp);
+							SwingUtilities.updateComponentTreeUI(groupPane);
+							SwingUtilities.updateComponentTreeUI(conf);
+						});
+						gPopup.add(gLeave);
+						grp.addMouseListener(new MouseListener() {
+							@Override
+							public void mouseClicked(MouseEvent e) {}
+							@Override
+							public void mousePressed(MouseEvent e) {
+								if(e.isPopupTrigger()) {
+									gPopup.show(grp,e.getX(),e.getY());
+								}
+							}
+							@Override
+							public void mouseReleased(MouseEvent e) {
+								if(e.isPopupTrigger()) {
+									gPopup.show(grp,e.getX(),e.getY());
+								}
+							}
+							@Override
+							public void mouseEntered(MouseEvent e) {}
+							@Override
+							public void mouseExited(MouseEvent e) {}
+						});
+						groupPane.add(grp);
+						SwingUtilities.updateComponentTreeUI(groupPane);
+						SwingUtilities.updateComponentTreeUI(conf);
+					});
+					//Dialog done
+					addGroup.addActionListener(n->{
+						silver.setVisible(true);
+					});
+					//Dialog end
+					group.addActionListener(n->{
+						conf.setVisible(true);
 					});
 					JMenuItem toggle=new JMenuItem("Disable Multicast");
 					toggle.addActionListener(n->{
@@ -283,25 +390,27 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 							try {
 								multi.setBroadcast(false);
 								inter.setEnabled(false);
+								group.setEnabled(false);
 								toggle.setText("Enable Multicast");
 							} catch (SocketException e1) {}
 						}else {
 							try {
 								multi.setBroadcast(true);
 								inter.setEnabled(true);
+								group.setEnabled(true);
 								toggle.setText("Disable Multicast");
 							}catch (SocketException e2) {}
 						}
 					});
 					multicast.add(inter);
+					multicast.add(group);
 					multicast.add(toggle);
-					bar.add(multicast);
+					network.add(multicast);
 				} catch (IOException e) {
 					System.err.println("[FATAL] Multicast Not Supported");
 				}
 			}
 			//multicast done
-			JMenu network=new JMenu("Network");
 			JMenuItem upload=new JMenuItem("Upload File");
 			upload.addActionListener(n->{
 				if(SocketUI.CHOOSER.showDialog(this,"OK")==JFileChooser.APPROVE_OPTION) {
@@ -436,6 +545,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			});
 			sizeDialog.add(sSouth,BorderLayout.SOUTH);
 			sizeDialog.pack();
+			sizeDialog.setMinimumSize(sizeDialog.getSize());
 			//Dialog end
 			showQueue.addActionListener(n->{
 				queue.setVisible(true);
@@ -496,6 +606,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 				public void windowDeactivated(WindowEvent e) {}
 			});
 			lDialog.pack();
+			lDialog.setMinimumSize(lDialog.getSize());
 			//Dialog end
 			losser.addActionListener(n->{
 				lDialog.setVisible(true);
@@ -538,7 +649,6 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			panel.add(bottom,BorderLayout.SOUTH);
 			JScrollPane inputScroll=new JScrollPane(input, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 			panel.add(inputScroll,BorderLayout.NORTH);
-            
 			setLayout(new BorderLayout());
 			view.setViewportView(display);
 			add(panel,BorderLayout.SOUTH);
@@ -556,6 +666,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		dataView.dispose();
 		socket.close();
 		EDT.interrupt();
+		run.run();
 	}
 	@Override
 	public void run() {

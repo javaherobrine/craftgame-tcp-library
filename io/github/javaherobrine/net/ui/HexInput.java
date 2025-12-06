@@ -50,6 +50,8 @@ public class HexInput extends JDialog{
 			jp.add(cANCEL);
 			dialog.add(jp,BorderLayout.SOUTH);
 			dialog.setTitle("String Input");
+			dialog.pack();
+			dialog.setMinimumSize(dialog.getSize());
 			//dialog done
 			setLayout(new BorderLayout());
 			add(new JLabel("Input Binary Data via Hex"),BorderLayout.NORTH);
@@ -104,6 +106,7 @@ public class HexInput extends JDialog{
 			panel.add(cancel);
 			add(panel,BorderLayout.SOUTH);
 			pack();
+			setMinimumSize(getSize());
 		});
 	}
 	public static void input(Consumer<byte[]> input) {
