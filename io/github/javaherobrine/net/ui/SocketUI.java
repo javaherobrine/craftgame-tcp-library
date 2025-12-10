@@ -60,6 +60,8 @@ public class SocketUI extends JFrame implements Runnable{
 	private JButton send=new JButton("Send");
 	private JMenuItem close=new JMenuItem("Disconnect");
 	private JMenu file=new JMenu("Network");
+	private boolean linewarp=false;
+	private byte[] temp=new byte[1];
 	public Runnable onClose=()->{};
 	/**
 	 * Must be specifically annotated
@@ -81,7 +83,6 @@ public class SocketUI extends JFrame implements Runnable{
 	 * If I put this lambda expression in the parameter of callback, there will be tons of temporary objects.
 	 * They are all callbacks
 	 */
-	private boolean linewarp=false;
 	@SuppressWarnings("unused")
 	private static final Blocker ALLOW=new Blocker(false,false,i-> false);
 	@SuppressWarnings("unused")
@@ -109,7 +110,8 @@ public class SocketUI extends JFrame implements Runnable{
 	};
 	private final Runnable APPEND_STRING=()->{
 		show.append(Character.toString((char)currentValue));
-		viewHex.insertRecv(currentValue);
+		temp[0]=(byte)currentValue;
+		viewHex.insertRecv(temp);
 	};
 	private final Runnable DISPLAY_IN_SCREEN=()->{
 		if(nDisplay) {
@@ -773,10 +775,10 @@ public class SocketUI extends JFrame implements Runnable{
 				e.printStackTrace();
 			} 
 		}
-		public void insertRecv(int str) {
+		public void insertRecv(byte[] str) {
 			try {
 				Document doc=pane.getDocument();
-				doc.insertString(doc.getLength(),construct(new byte[] {(byte)str}), BLUE);
+				doc.insertString(doc.getLength(),construct(str), BLUE);
 			} catch (BadLocationException e) {}
 		}
 		public void insertURG(byte[] str) {

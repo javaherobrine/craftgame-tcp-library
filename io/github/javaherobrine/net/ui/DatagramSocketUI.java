@@ -458,7 +458,10 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					}
 				}
 			});
+			JMenuItem sendHex=new JMenuItem("Send Binary Data");
+			sendHex.addActionListener(n->HexInput.input(SEND));
 			network.add(upload);
+			network.add(sendHex);
 			JMenuItem size=new JMenuItem("Datagram Size Policy");
 			JMenuItem showQueue=new JMenuItem("Show data queue");
 			//Size Dialog
@@ -817,7 +820,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			JMenuItem send=new JMenuItem("Send");
 			send.addActionListener(n->{
 				display.remove(pane);
-				EDT.put(toBeSent);
+				PacketLosser.sendAsync(toBeSent, EDT, recvLoss);
 				if(displaySend) {
 					displayData(toBeSent.data(),socket.getLocalSocketAddress(),toBeSent.remote(),true);
 				}
