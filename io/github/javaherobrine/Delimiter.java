@@ -1,8 +1,8 @@
 package io.github.javaherobrine;
 import java.io.*;
 public class Delimiter {
-	private TrieNode tree=new TrieNode();
-	private TrieNode current=null;
+	private ACNode tree=new ACNode();
+	private ACNode current=null;
 	private ByteArrayOutputStream temp=new ByteArrayOutputStream();
 	public Delimiter delimiter(byte[] input) {
 		tree.push(input, input);

@@ -4,7 +4,7 @@ import java.io.*;
 /**
  * The TCP client, with handshake and protocol switching
  */
-public abstract class Client extends Thread implements AbstractClient{
+public abstract class Client implements AbstractClient, Runnable{
 	protected Socket client;
 	protected Protocol protocol;
 	protected boolean disconnected=false;
@@ -46,6 +46,9 @@ public abstract class Client extends Thread implements AbstractClient{
 	public void close() throws IOException {
 		disconnected=true;
 		client.close();
+	}
+	public void start() {
+		Thread.startVirtualThread(this);
 	}
 	public abstract Protocol protocol() throws IOException;
 	public abstract void handshake() throws IOException;

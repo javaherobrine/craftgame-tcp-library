@@ -3,22 +3,25 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import io.github.javaherobrine.*;
-public abstract class Server<T> extends Thread implements Closeable{
+public abstract class Server<T> implements Closeable, Runnable{
 	private ServerSocket server;
-	private Map<T,ServerSideClient> connected=new HashMap<T,ServerSideClient>();
+	private Map<T,ServerSideClient<T>> connected=new HashMap<T,ServerSideClient<T>>();
 	EventDispatchThread EDT=new EventDispatchThread();
 	public Server(int port) throws IOException {
 		server=new ServerSocket(port);
 		start();
+	}
+	public void start() {
+		Thread.startVirtualThread(this);
 	}
 	public Client removeClient(T name) {
 		synchronized(connected) {
 			return connected.remove(name);
 		}
 	}
-	public abstract ServerSideClient accept(Socket socket);
+	public abstract ServerSideClient<T> accept(Socket socket);
 	public void accept() throws IOException {
-		ServerSideClient c=accept(server.accept());
+		ServerSideClient<T> c=accept(server.accept());
 		if(c.protocol instanceof Protocol.NullProtocol) {
 			c.close();//bad protocol
 			return;

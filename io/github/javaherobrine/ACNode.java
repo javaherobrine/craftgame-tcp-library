@@ -1,22 +1,22 @@
 package io.github.javaherobrine;
 import java.util.*;
-public class TrieNode {
-	public TrieNode[] next=new TrieNode[256];
-	private TrieNode kmp;//used in AC Automaton
+public class ACNode {
+	public ACNode[] next=new ACNode[256];
+	private ACNode kmp;//used in AC Automaton
 	public Object res=null;
 	public void push(byte[] input, Object obj) {
-		TrieNode current=this;
+		ACNode current=this;
 		for(byte b:input) {
 			int index=(b>=0?b:256+b);
 			if(current.next[index]==null) {
-				current.next[index]=new TrieNode();
+				current.next[index]=new ACNode();
 			}
 			current=current.next[index];
 		}
 		current.res=obj;
 	}
 	public Object get(byte[] input) {
-		TrieNode current=this;
+		ACNode current=this;
 		for(byte b:input) {
 			int index=(b>=0?b:256+b);
 			if(current.next[index]==null) {
@@ -30,15 +30,15 @@ public class TrieNode {
 	 * Build an AC Automaton
 	 */
 	public void AC() {
-		TrieNode pre=new TrieNode();
+		ACNode pre=new ACNode();
 		for(int i=0;i<256;++i) {
 			pre.next[i]=this;
 		}
 		this.kmp=pre;
-		Queue<TrieNode> q=new LinkedList<>();
+		Queue<ACNode> q=new LinkedList<>();
 		q.add(this);
 		while(!q.isEmpty()) {
-			TrieNode t=q.poll();
+			ACNode t=q.poll();
 			for(int i=0;i<256;++i) {
 				if(t.next[i]!=null) {
 					t.next[i].kmp=t.kmp.next[i];
