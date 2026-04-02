@@ -51,8 +51,8 @@ public class SocketUI extends JFrame implements Runnable{
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
 	private static final int INITIAL_DECODE_BUFFER_SIZE=16;
-	private static final int MAX_DECODE_BUFFER_SIZE=1<<20;
-	private static final int BUFFER_GROWTH_CHUNK_SIZE=1<<16;
+	private static final int MAX_DECODE_BUFFER_SIZE=1024*1024;
+	private static final int BUFFER_GROWTH_CHUNK_SIZE=64*1024;
 	private static final char REPLACEMENT_CHARACTER='\uFFFD';
 	private final CharsetDecoder decoder=Charset.defaultCharset()
 		.newDecoder()
@@ -188,7 +188,11 @@ public class SocketUI extends JFrame implements Runnable{
 			if(!nDisplay) {
 				try {
 					SwingUtilities.invokeAndWait(FLUSH_STRING);
-				} catch (InvocationTargetException | InterruptedException e) {}
+				} catch (InvocationTargetException e) {
+					// Ignore: UI flush is best-effort during shutdown.
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
 			}
 			EDT.interrupt();
 			shutdownInput();
@@ -212,7 +216,7 @@ public class SocketUI extends JFrame implements Runnable{
 					show.append(Character.toString(REPLACEMENT_CHARACTER));
 					return;
 				}
-				int nextCap=decodeIn.capacity()<BUFFER_GROWTH_CHUNK_SIZE?(decodeIn.capacity()<<1):decodeIn.capacity()+BUFFER_GROWTH_CHUNK_SIZE;
+				int nextCap=nextDecodeBufferCapacity(decodeIn.capacity());
 				if(nextCap>MAX_DECODE_BUFFER_SIZE) {
 					nextCap=MAX_DECODE_BUFFER_SIZE;
 				}
@@ -247,6 +251,9 @@ public class SocketUI extends JFrame implements Runnable{
 		}else {
 			decodeIn.compact();
 		}
+	}
+	private int nextDecodeBufferCapacity(int currentCapacity) {
+		return currentCapacity<BUFFER_GROWTH_CHUNK_SIZE?(currentCapacity<<1):currentCapacity+BUFFER_GROWTH_CHUNK_SIZE;
 	}
 	//GUI
 	public SocketUI(Socket s) {
