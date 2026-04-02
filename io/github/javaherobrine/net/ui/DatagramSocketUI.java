@@ -45,7 +45,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			InetSocketAddress remote=new InetSocketAddress(IP,i);
 			if(b.length>MSS) {
 				switch(proc) {
-				case OutOfLength.DISCARD:
+				case DISCARD:
 					byte[] temp=new byte[MSS];
 					System.arraycopy(b,0,temp,0,MSS);
 					PacketLosser.sendAsync(new SendDatagramEvent(socket,remote,b),EDT,sendLoss);
@@ -54,7 +54,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						displayData(b,socket.getLocalSocketAddress(),remote,true);
 					}
 					break;
-				case OutOfLength.SEND:
+				case SEND:
 					SendDatagramEvent[] events=SendDatagramEvent.split(socket,remote,b, MSS);
 					for(int j=0;j<events.length;++j) {
 						PacketLosser.sendAsync(events[j],EDT,sendLoss);
@@ -63,7 +63,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						}
 					}
 					break;
-				case OutOfLength.QUEUE:
+				case QUEUE:
 					SendDatagramEvent[] events0=SendDatagramEvent.split(socket,remote,b,MSS);
 					PacketLosser.sendAsync(events0[0],EDT,sendLoss);
 					if(displaySend) {
@@ -476,8 +476,8 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			sModes.setLayout(sBox);
 			JRadioButton sDiscard=new JRadioButton("Just send data in interval [0,size-1]");
 			sDiscard.setSelected(true);
-			JRadioButton sSend=new JRadioButton("Seperate them and send them immediately");
-			JRadioButton sQueue=new JRadioButton("Seperate them, send the first, put the rest into a queue");
+			JRadioButton sSend=new JRadioButton("Separate them and send them immediately");
+			JRadioButton sQueue=new JRadioButton("Separate them, send the first, put the rest into a queue");
 			sBG.add(sDiscard);
 			sBG.add(sSend);
 			sBG.add(sQueue);
@@ -529,7 +529,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					}
 					sizeDialog.dispose();
 				}catch(NumberFormatException nfe) {
-					JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must be less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
 					return;
 				}
 			});
@@ -576,11 +576,11 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					uL=Double.parseDouble(up.getText());
 					dL=Double.parseDouble(down.getText());
 				}catch(NumberFormatException e1) {
-					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about this","Illegal Input",JOptionPane.ERROR_MESSAGE);
 					return;
 				}
 				if(uL<0||dL<0||uL>1||dL>1) {
-					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about this","Illegal Input",JOptionPane.ERROR_MESSAGE);
 					return;
 				}
 				sendLoss=uL;
