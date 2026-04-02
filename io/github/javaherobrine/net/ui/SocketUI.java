@@ -50,9 +50,14 @@ public class SocketUI extends JFrame implements Runnable{
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
-	private final CharsetDecoder decoder=Charset.defaultCharset().newDecoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-	private ByteBuffer decodeIn=ByteBuffer.allocate(16);
-	private CharBuffer decodeOut=CharBuffer.allocate(16);
+	private static final int DECODE_BUFFER_SIZE=16;
+	private static final int MAX_DECODE_BUFFER_SIZE=1<<20;
+	private final CharsetDecoder decoder=Charset.defaultCharset()
+		.newDecoder()
+		.onMalformedInput(CodingErrorAction.REPLACE)
+		.onUnmappableCharacter(CodingErrorAction.REPLACE);
+	private ByteBuffer decodeIn=ByteBuffer.allocate(DECODE_BUFFER_SIZE);
+	private CharBuffer decodeOut=CharBuffer.allocate(DECODE_BUFFER_SIZE);
 	private JMenu trunc=new JMenu("Modify Blocking Policies");
 	private JMenuItem distrunc=new JMenuItem("Resume the stream");
 	private JMenuItem redirect=new JMenuItem("Redirect Data you received");
@@ -193,6 +198,12 @@ public class SocketUI extends JFrame implements Runnable{
 	private void appendDecodedText(byte b,boolean end) {
 		if(!end) {
 			if(!decodeIn.hasRemaining()) {
+				if(decodeIn.capacity()>=MAX_DECODE_BUFFER_SIZE) {
+					decoder.reset();
+					decodeIn.clear();
+					show.append(Character.toString('\uFFFD'));
+					return;
+				}
 				ByteBuffer next=ByteBuffer.allocate(decodeIn.capacity()<<1);
 				decodeIn.flip();
 				next.put(decodeIn);
@@ -201,30 +212,24 @@ public class SocketUI extends JFrame implements Runnable{
 			decodeIn.put(b);
 		}
 		decodeIn.flip();
-		while(true) {
-			CoderResult result=decoder.decode(decodeIn,decodeOut,end);
+		CoderResult result;
+		do {
+			result=decoder.decode(decodeIn,decodeOut,end);
 			decodeOut.flip();
 			if(decodeOut.hasRemaining()) {
 				show.append(decodeOut.toString());
 			}
 			decodeOut.clear();
-			if(result.isOverflow()) {
-				continue;
-			}
-			break;
-		}
+		} while(result.isOverflow());
 		if(end) {
-			while(true) {
-				CoderResult result=decoder.flush(decodeOut);
+			do {
+				result=decoder.flush(decodeOut);
 				decodeOut.flip();
 				if(decodeOut.hasRemaining()) {
 					show.append(decodeOut.toString());
 				}
 				decodeOut.clear();
-				if(!result.isOverflow()) {
-					break;
-				}
-			}
+			} while(result.isOverflow());
 			decoder.reset();
 			decodeIn.clear();
 		}else {
