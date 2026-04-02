@@ -606,8 +606,8 @@ public class SocketUI extends JFrame implements Runnable{
 			rNorth.add(r2F);
 			rNorth.add(r2S);
 			rDialog.add(rNorth,BorderLayout.NORTH);
-			JPanel rSouth=new JPanel(new FlowLayout());
-			rSouth.add(new JLabel("File="));
+			JPanel rCenter=new JPanel(new FlowLayout());
+			rCenter.add(new JLabel("File="));
 			JTextField rTF=new JTextField();
 			rTF.setColumns(20);
 			JButton rCF=new JButton("Choose File");
@@ -617,10 +617,10 @@ public class SocketUI extends JFrame implements Runnable{
 				}
 			});
 			JCheckBox rA=new JCheckBox("Append");
-			rSouth.add(rTF);
-			rSouth.add(rCF);
-			rSouth.add(rA);
-			rDialog.add(rSouth,BorderLayout.CENTER);
+			rCenter.add(rTF);
+			rCenter.add(rCF);
+			rCenter.add(rA);
+			rDialog.add(rCenter,BorderLayout.CENTER);
 			JPanel rActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
 			JButton rOK=new JButton("OK");
 			JButton rCancel=new JButton("Cancel");
