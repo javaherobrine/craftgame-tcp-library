@@ -598,7 +598,7 @@ public class SocketUI extends JFrame implements Runnable{
 			});
 			//Redirect Dialog
 			JDialog rDialog=new JDialog(this,"Data Redirect",true);
-			rDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+			rDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 			rDialog.setLayout(new BorderLayout());
 			JCheckBox r2S=new JCheckBox("Display in screen"),r2F=new JCheckBox("Output to file");
 			r2S.setSelected(true);
@@ -621,54 +621,48 @@ public class SocketUI extends JFrame implements Runnable{
 			rSouth.add(rCF);
 			rSouth.add(rA);
 			rDialog.add(rSouth,BorderLayout.SOUTH);
+			JPanel rActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+			JButton rOK=new JButton("OK");
+			JButton rCancel=new JButton("Cancel");
+			rActions.add(rOK);
+			rActions.add(rCancel);
+			rDialog.add(rActions,BorderLayout.CENTER);
 			rDialog.pack();
-			rDialog.setMinimumSize(rDialog.getSize());
-			rDialog.addWindowListener(new WindowListener() {
-				@Override
-				public void windowOpened(WindowEvent e) {}
-				@Override
-				public void windowClosing(WindowEvent e) {
-					if(r2F.isSelected()) {
-						File now=new File(rTF.getText());
-						if(now.isDirectory()) {
-							JOptionPane.showMessageDialog(rDialog,"Can't write into a folder","Illegal Input",JOptionPane.ERROR_MESSAGE);
+			rDialog.setMinimumSize(new Dimension(480,140));
+			rOK.addActionListener(n->{
+				if(r2F.isSelected()) {
+					File now=new File(rTF.getText());
+					if(now.isDirectory()) {
+						JOptionPane.showMessageDialog(rDialog,"Can't write into a folder","Illegal Input",JOptionPane.ERROR_MESSAGE);
+						return;
+					}
+					FileOutputStream fOutNow=null;
+					boolean nChangeStream=rTF.getText().equals(lastFile);
+					if(nRedirect||(!nChangeStream)) {
+						try {
+							fOutNow=new FileOutputStream(now,rA.isSelected());
+						} catch (FileNotFoundException e1) {
+							JOptionPane.showMessageDialog(rDialog,"Permission Denied","Illegal Input",JOptionPane.ERROR_MESSAGE);
 							return;
 						}
-						FileOutputStream fOutNow=null;
-						boolean nChangeStream=rTF.getText().equals(lastFile);
-						if(nRedirect||(!nChangeStream)) {
-							try {
-								fOutNow=new FileOutputStream(now,rA.isSelected());
-							} catch (FileNotFoundException e1) {
-								JOptionPane.showMessageDialog(rDialog,"Permission Denied","Illegal Input",JOptionPane.ERROR_MESSAGE);
-								return;
-							}
-						}
-						if(!(nChangeStream||nRedirect)) {
-							try {
-								fOut.close();
-							} catch (IOException e1) {
-								System.err.println("[ERROR] FileOutputStream can't be closed");
-							}
-						}
-						if(!nChangeStream) {
-							fOut=fOutNow;
+					}
+					if(!(nChangeStream||nRedirect)) {
+						try {
+							fOut.close();
+						} catch (IOException e1) {
+							System.err.println("[ERROR] FileOutputStream can't be closed");
 						}
 					}
-					nDisplay=!r2S.isSelected();
-					nRedirect=!r2F.isSelected();
-					rDialog.dispose();
+					if(!nChangeStream) {
+						fOut=fOutNow;
+					}
 				}
-				@Override
-				public void windowClosed(WindowEvent e) {}
-				@Override
-				public void windowIconified(WindowEvent e) {}
-				@Override
-				public void windowDeiconified(WindowEvent e) {}
-				@Override
-				public void windowActivated(WindowEvent e) {}
-				@Override
-				public void windowDeactivated(WindowEvent e) {}
+				nDisplay=!r2S.isSelected();
+				nRedirect=!r2F.isSelected();
+				rDialog.dispose();
+			});
+			rCancel.addActionListener(n->{
+				rDialog.dispose();
 			});
 			//Dialog done
 			redirect.addActionListener(n->{
