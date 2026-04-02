@@ -620,13 +620,13 @@ public class SocketUI extends JFrame implements Runnable{
 			rSouth.add(rTF);
 			rSouth.add(rCF);
 			rSouth.add(rA);
-			rDialog.add(rSouth,BorderLayout.SOUTH);
+			rDialog.add(rSouth,BorderLayout.CENTER);
 			JPanel rActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
 			JButton rOK=new JButton("OK");
 			JButton rCancel=new JButton("Cancel");
 			rActions.add(rOK);
 			rActions.add(rCancel);
-			rDialog.add(rActions,BorderLayout.CENTER);
+			rDialog.add(rActions,BorderLayout.SOUTH);
 			rDialog.pack();
 			rDialog.setMinimumSize(new Dimension(480,140));
 			rOK.addActionListener(n->{
