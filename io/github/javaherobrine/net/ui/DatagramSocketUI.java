@@ -468,10 +468,12 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			sNorth.add(sField);
 			ButtonGroup sBG=new ButtonGroup();
 			sizeDialog.add(sNorth,BorderLayout.NORTH);
-			sizeDialog.add(new JLabel("What if your data is out of max datagram length?"),BorderLayout.CENTER);
-			JPanel sSouth=new JPanel();
-			BoxLayout sBox=new BoxLayout(sSouth,BoxLayout.Y_AXIS);
-			sSouth.setLayout(sBox);
+			JPanel sCenter=new JPanel();
+			sCenter.setLayout(new BorderLayout());
+			sCenter.add(new JLabel("What if your data is out of max datagram length?"),BorderLayout.NORTH);
+			JPanel sModes=new JPanel();
+			BoxLayout sBox=new BoxLayout(sModes,BoxLayout.Y_AXIS);
+			sModes.setLayout(sBox);
 			JRadioButton sDiscard=new JRadioButton("Just send data in interval [0,size-1]");
 			sDiscard.setSelected(true);
 			JRadioButton sSend=new JRadioButton("Seperate them and send them immediately");
@@ -479,67 +481,60 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			sBG.add(sDiscard);
 			sBG.add(sSend);
 			sBG.add(sQueue);
-			sSouth.add(sDiscard);
-			sSouth.add(sSend);
-			sSouth.add(sQueue);
-			sizeDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-			sizeDialog.addWindowListener(new WindowListener() {
-				@Override
-				public void windowOpened(WindowEvent e) {}
-				@Override
-				public void windowClosing(WindowEvent e) {
-					try {
-						int i=Integer.parseInt(sField.getText());
-						if(i>65507) {
-							JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must be less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
-							return;
-						}else if(i==0) {
-							JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size = 0?","Illegal Input",JOptionPane.ERROR_MESSAGE);
-							return;
-						}
-						MSS=i;
-						OutOfLength prev=proc;
-						if(sDiscard.isSelected()) {
-							proc=OutOfLength.DISCARD;
-						}else if(sSend.isSelected()) {
-							proc=OutOfLength.SEND;
-						}else {
-							proc=OutOfLength.QUEUE;
-						}
-						if(prev==OutOfLength.QUEUE&&proc!=prev&&queue.nonEmpty()) {
-							if(JOptionPane.showConfirmDialog(sizeDialog,"If you switch to another way, all the data in the queue will be discarded, will you?","Confirmation",JOptionPane.YES_NO_OPTION)!=JOptionPane.YES_OPTION) {
-								proc=prev;
-								sSend.setSelected(false);
-								sDiscard.setSelected(false);
-								sQueue.setSelected(true);
-							}
-						}else if(prev!=OutOfLength.QUEUE&&proc==OutOfLength.QUEUE) {
-							queue=new SendQueue();
-							showQueue.setEnabled(true);
-						}
-						if(proc!=OutOfLength.QUEUE&&prev==OutOfLength.QUEUE) {
-							showQueue.setEnabled(false);
-							queue.dispose();
-							queue=null;
-						}
-						sizeDialog.dispose();
-					}catch(NumberFormatException nfe) {
-						JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
+			sModes.add(sDiscard);
+			sModes.add(sSend);
+			sModes.add(sQueue);
+			sCenter.add(sModes,BorderLayout.CENTER);
+			sizeDialog.add(sCenter,BorderLayout.CENTER);
+			JPanel sActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+			JButton sizeOK=new JButton("OK");
+			JButton sizeCancel=new JButton("Cancel");
+			sActions.add(sizeOK);
+			sActions.add(sizeCancel);
+			sizeDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+			sizeOK.addActionListener(n->{
+				try {
+					int i=Integer.parseInt(sField.getText());
+					if(i>65507) {
+						JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must be less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
+						return;
+					}else if(i==0) {
+						JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size = 0?","Illegal Input",JOptionPane.ERROR_MESSAGE);
 						return;
 					}
+					MSS=i;
+					OutOfLength prev=proc;
+					if(sDiscard.isSelected()) {
+						proc=OutOfLength.DISCARD;
+					}else if(sSend.isSelected()) {
+						proc=OutOfLength.SEND;
+					}else {
+						proc=OutOfLength.QUEUE;
+					}
+					if(prev==OutOfLength.QUEUE&&proc!=prev&&queue.nonEmpty()) {
+						if(JOptionPane.showConfirmDialog(sizeDialog,"If you switch to another way, all the data in the queue will be discarded, will you?","Confirmation",JOptionPane.YES_NO_OPTION)!=JOptionPane.YES_OPTION) {
+							proc=prev;
+							sSend.setSelected(false);
+							sDiscard.setSelected(false);
+							sQueue.setSelected(true);
+						}
+					}else if(prev!=OutOfLength.QUEUE&&proc==OutOfLength.QUEUE) {
+						queue=new SendQueue();
+						showQueue.setEnabled(true);
+					}
+					if(proc!=OutOfLength.QUEUE&&prev==OutOfLength.QUEUE) {
+						showQueue.setEnabled(false);
+						queue.dispose();
+						queue=null;
+					}
+					sizeDialog.dispose();
+				}catch(NumberFormatException nfe) {
+					JOptionPane.showMessageDialog(sizeDialog,"Max Datagram Size must less than 65508","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					return;
 				}
-				@Override
-				public void windowClosed(WindowEvent e) {}
-				@Override
-				public void windowIconified(WindowEvent e) {}
-				@Override
-				public void windowDeiconified(WindowEvent e) {}
-				@Override
-				public void windowActivated(WindowEvent e) {}
-				@Override
-				public void windowDeactivated(WindowEvent e) {}
 			});
-			sizeDialog.add(sSouth,BorderLayout.SOUTH);
+			sizeCancel.addActionListener(n->sizeDialog.dispose());
+			sizeDialog.add(sActions,BorderLayout.SOUTH);
 			sizeDialog.pack();
 			sizeDialog.setMinimumSize(sizeDialog.getSize());
 			//Dialog end
@@ -555,8 +550,6 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			JDialog lDialog=new JDialog(this,"the RPM Package Manager",true);
 			JPanel lNorth=new JPanel();
 			lNorth.setLayout(new FlowLayout());
-			JPanel lSouth=new JPanel();
-			lSouth.setLayout(new FlowLayout());
 			lDialog.setLayout(new BorderLayout());
 			JTextField up=new JTextField("0");
 			JTextField down=new JTextField("0");
@@ -564,43 +557,37 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 			down.setColumns(8);
 			lNorth.add(new JLabel("P(Uplink\'s datagram loss)="));
 			lNorth.add(up);
-			lSouth.add(new JLabel("P(Downlink\'s datagram loss)="));
-			lSouth.add(down);
+			JPanel lCenter=new JPanel();
+			lCenter.setLayout(new FlowLayout());
+			lCenter.add(new JLabel("P(Downlink\'s datagram loss)="));
+			lCenter.add(down);
 			lDialog.add(lNorth,BorderLayout.NORTH);
-			lDialog.add(lSouth,BorderLayout.SOUTH);
-			lDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-			lDialog.addWindowListener(new WindowListener() {
-				@Override
-				public void windowOpened(WindowEvent e) {}
-				@Override
-				public void windowClosing(WindowEvent e) {
-					double uL=0,dL=0;
-					try {
-						uL=Double.parseDouble(up.getText());
-						dL=Double.parseDouble(down.getText());
-					}catch(NumberFormatException e1) {
-						JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
-						return;
-					}
-					if(uL<0||dL<0||uL>1||dL>1) {
-						JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
-						return;
-					}
-					sendLoss=uL;
-					recvLoss=dL;
-					lDialog.dispose();
+			lDialog.add(lCenter,BorderLayout.CENTER);
+			JPanel lActions=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+			JButton lOK=new JButton("OK");
+			JButton lCancel=new JButton("Cancel");
+			lActions.add(lOK);
+			lActions.add(lCancel);
+			lDialog.add(lActions,BorderLayout.SOUTH);
+			lDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+			lOK.addActionListener(n->{
+				double uL=0,dL=0;
+				try {
+					uL=Double.parseDouble(up.getText());
+					dL=Double.parseDouble(down.getText());
+				}catch(NumberFormatException e1) {
+					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					return;
 				}
-				@Override
-				public void windowClosed(WindowEvent e) {}
-				@Override
-				public void windowIconified(WindowEvent e) {}
-				@Override
-				public void windowDeiconified(WindowEvent e) {}
-				@Override
-				public void windowActivated(WindowEvent e) {}
-				@Override
-				public void windowDeactivated(WindowEvent e) {}
+				if(uL<0||dL<0||uL>1||dL>1) {
+					JOptionPane.showMessageDialog(lDialog,"I\'d like to tell your Probability Theory professor about thus","Illegal Input",JOptionPane.ERROR_MESSAGE);
+					return;
+				}
+				sendLoss=uL;
+				recvLoss=dL;
+				lDialog.dispose();
 			});
+			lCancel.addActionListener(n->lDialog.dispose());
 			lDialog.pack();
 			lDialog.setMinimumSize(lDialog.getSize());
 			//Dialog end
