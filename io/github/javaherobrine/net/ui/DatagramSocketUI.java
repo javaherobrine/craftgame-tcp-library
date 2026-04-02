@@ -262,8 +262,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						}catch(NumberFormatException nfe) {
 							JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
 						} catch (IOException e1) {
-							System.err.println("[WARNING] Bad Options");
-							selectInterface.dispose();
+							JOptionPane.showMessageDialog(selectInterface,"Failed to apply multicast settings","Illegal Input",JOptionPane.ERROR_MESSAGE);
 						}
 					});
 					confCancel.addActionListener(n->{
