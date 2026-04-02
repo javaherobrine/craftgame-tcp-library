@@ -252,7 +252,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 						try {
 							int i=Integer.parseInt(ttl.getText());
 							if(i<0||i>255) {
-								JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+								JOptionPane.showMessageDialog(selectInterface,"TTL's range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
 								return;
 							}
 							multi.setNetworkInterface(iList.get(interfaces.getSelectedIndex()));
@@ -260,7 +260,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 							multi.setOption(StandardSocketOptions.IP_MULTICAST_LOOP,loop.isSelected());
 							selectInterface.dispose();
 						}catch(NumberFormatException nfe) {
-							JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+							JOptionPane.showMessageDialog(selectInterface,"TTL's range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
 						} catch (IOException e1) {
 							JOptionPane.showMessageDialog(selectInterface,"Failed to apply multicast settings","Settings Error",JOptionPane.ERROR_MESSAGE);
 						}
