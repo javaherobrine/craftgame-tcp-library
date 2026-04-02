@@ -50,14 +50,16 @@ public class SocketUI extends JFrame implements Runnable{
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
-	private static final int DECODE_BUFFER_SIZE=16;
+	private static final int INITIAL_DECODE_BUFFER_SIZE=16;
 	private static final int MAX_DECODE_BUFFER_SIZE=1<<20;
+	private static final int BUFFER_GROWTH_CHUNK_SIZE=1<<16;
+	private static final char REPLACEMENT_CHARACTER='\uFFFD';
 	private final CharsetDecoder decoder=Charset.defaultCharset()
 		.newDecoder()
 		.onMalformedInput(CodingErrorAction.REPLACE)
 		.onUnmappableCharacter(CodingErrorAction.REPLACE);
-	private ByteBuffer decodeIn=ByteBuffer.allocate(DECODE_BUFFER_SIZE);
-	private CharBuffer decodeOut=CharBuffer.allocate(DECODE_BUFFER_SIZE);
+	private ByteBuffer decodeIn=ByteBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
+	private CharBuffer decodeOut=CharBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
 	private JMenu trunc=new JMenu("Modify Blocking Policies");
 	private JMenuItem distrunc=new JMenuItem("Resume the stream");
 	private JMenuItem redirect=new JMenuItem("Redirect Data you received");
@@ -195,16 +197,26 @@ public class SocketUI extends JFrame implements Runnable{
 			shutdownInput();
 		}
 	}
+	/**
+	 * Decode one received byte (or flush at stream end) and append decoded text to the display area.
+	 *
+	 * @param b received byte value; ignored when {@code end} is {@code true}
+	 * @param end {@code true} to flush decoder state at end-of-stream, otherwise decode {@code b}
+	 */
 	private void appendDecodedText(byte b,boolean end) {
 		if(!end) {
 			if(!decodeIn.hasRemaining()) {
 				if(decodeIn.capacity()>=MAX_DECODE_BUFFER_SIZE) {
 					decoder.reset();
 					decodeIn.clear();
-					show.append(Character.toString('\uFFFD'));
+					show.append(Character.toString(REPLACEMENT_CHARACTER));
 					return;
 				}
-				ByteBuffer next=ByteBuffer.allocate(decodeIn.capacity()<<1);
+				int nextCap=decodeIn.capacity()<BUFFER_GROWTH_CHUNK_SIZE?(decodeIn.capacity()<<1):decodeIn.capacity()+BUFFER_GROWTH_CHUNK_SIZE;
+				if(nextCap>MAX_DECODE_BUFFER_SIZE) {
+					nextCap=MAX_DECODE_BUFFER_SIZE;
+				}
+				ByteBuffer next=ByteBuffer.allocate(nextCap);
 				decodeIn.flip();
 				next.put(decodeIn);
 				decodeIn=next;
