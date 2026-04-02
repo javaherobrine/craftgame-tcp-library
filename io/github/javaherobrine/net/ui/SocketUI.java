@@ -56,10 +56,10 @@ public class SocketUI extends JFrame implements Runnable{
 	private static final char REPLACEMENT_CHARACTER='\uFFFD';
 	private Charset charset=Charset.defaultCharset();
 	private final Object decodeLock=new Object();
-	private CharsetDecoder decoder=createDecoder(charset);
+	private CharsetDecoder decoder;
 	private ByteBuffer decodeIn=ByteBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
 	private CharBuffer decodeOut=CharBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
-	private String decodedChunk="";
+	private String decodedChunk=null;
 	private boolean decodeFlush=false;
 	private JMenu trunc=new JMenu("Modify Blocking Policies");
 	private JMenuItem distrunc=new JMenuItem("Resume the stream");
@@ -123,7 +123,9 @@ public class SocketUI extends JFrame implements Runnable{
 		in.speed=speed;
 	};
 	private final Runnable APPEND_STRING=()->{
-		show.append(decodedChunk);
+		if(decodedChunk!=null&&decodedChunk.length()!=0) {
+			show.append(decodedChunk);
+		}
 		if(!decodeFlush) {
 			temp[0]=(byte)currentValue;
 			viewHex.insertRecv(temp);
@@ -221,48 +223,48 @@ public class SocketUI extends JFrame implements Runnable{
 	private String appendDecodedText(byte b,boolean end) {
 		StringBuilder out=new StringBuilder();
 		synchronized(decodeLock) {
-		if(!end) {
-			if(!decodeIn.hasRemaining()) {
-				if(decodeIn.capacity()>=MAX_DECODE_BUFFER_SIZE) {
-					decoder.reset();
-					decodeIn.clear();
-					return Character.toString(REPLACEMENT_CHARACTER);
+			if(!end) {
+				if(!decodeIn.hasRemaining()) {
+					if(decodeIn.capacity()>=MAX_DECODE_BUFFER_SIZE) {
+						decoder.reset();
+						decodeIn.clear();
+						return Character.toString(REPLACEMENT_CHARACTER);
+					}
+					int nextCap=nextDecodeBufferCapacity(decodeIn.capacity());
+					if(nextCap>MAX_DECODE_BUFFER_SIZE) {
+						nextCap=MAX_DECODE_BUFFER_SIZE;
+					}
+					ByteBuffer next=ByteBuffer.allocate(nextCap);
+					decodeIn.flip();
+					next.put(decodeIn);
+					decodeIn=next;
 				}
-				int nextCap=nextDecodeBufferCapacity(decodeIn.capacity());
-				if(nextCap>MAX_DECODE_BUFFER_SIZE) {
-					nextCap=MAX_DECODE_BUFFER_SIZE;
-				}
-				ByteBuffer next=ByteBuffer.allocate(nextCap);
-				decodeIn.flip();
-				next.put(decodeIn);
-				decodeIn=next;
+				decodeIn.put(b);
 			}
-			decodeIn.put(b);
-		}
-		decodeIn.flip();
-		CoderResult result;
-		do {
-			result=decoder.decode(decodeIn,decodeOut,end);
-			decodeOut.flip();
-			if(decodeOut.hasRemaining()) {
-				out.append(decodeOut);
-			}
-			decodeOut.clear();
-		} while(result.isOverflow());
-		if(end) {
+			decodeIn.flip();
+			CoderResult result;
 			do {
-				result=decoder.flush(decodeOut);
+				result=decoder.decode(decodeIn,decodeOut,end);
 				decodeOut.flip();
 				if(decodeOut.hasRemaining()) {
 					out.append(decodeOut);
 				}
 				decodeOut.clear();
 			} while(result.isOverflow());
-			decoder.reset();
-			decodeIn.clear();
-		}else {
-			decodeIn.compact();
-		}
+			if(end) {
+				do {
+					result=decoder.flush(decodeOut);
+					decodeOut.flip();
+					if(decodeOut.hasRemaining()) {
+						out.append(decodeOut);
+					}
+					decodeOut.clear();
+				} while(result.isOverflow());
+				decoder.reset();
+				decodeIn.clear();
+			}else {
+				decodeIn.compact();
+			}
 		}
 		return out.toString();
 	}
@@ -277,6 +279,9 @@ public class SocketUI extends JFrame implements Runnable{
 	public SocketUI(Socket soc,Runnable r) {
 		EDT=new EventDispatchThread();
 		EDT.start();
+		synchronized(decodeLock) {
+			decoder=createDecoder(charset);
+		}
 		socket=soc;
 		TITLE=socket.toString();
 		TITLE_BLOCKED="[Input Blocked]"+TITLE;
@@ -551,14 +556,21 @@ public class SocketUI extends JFrame implements Runnable{
 			setNorth.add(new JLabel("Charset="));
 			JComboBox<Charset> list=new JComboBox<>(Charset.availableCharsets().values().toArray(new Charset[0]));
 			list.setSelectedItem(charset);
-			setNorth.add(new JScrollPane(list));
+			setNorth.add(list);
 			JPanel setSouth=new JPanel(new FlowLayout(FlowLayout.RIGHT));
 			JButton setOK=new JButton("OK");
 			JButton setCancel=new JButton("Cancel");
 			setOK.addActionListener(n->{
-				Charset set=(Charset)list.getSelectedItem();
 				synchronized(decodeLock) {
-					charset=set!=null?set:Charset.defaultCharset();
+					String pending=appendDecodedText((byte)0,true);
+					if(pending.length()!=0) {
+						show.append(pending);
+					}
+					Charset set=list.getItemAt(list.getSelectedIndex());
+					if(set==null) {
+						set=Charset.defaultCharset();
+					}
+					charset=set;
 					decoder=createDecoder(charset);
 					decodeIn=ByteBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
 					decodeOut=CharBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
