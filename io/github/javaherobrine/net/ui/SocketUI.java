@@ -4,6 +4,8 @@ import java.awt.event.*;
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.net.*;
+import java.nio.*;
+import java.nio.charset.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.text.*;
@@ -48,12 +50,24 @@ public class SocketUI extends JFrame implements Runnable{
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
+	private static final int INITIAL_DECODE_BUFFER_SIZE=16;
+	private static final int MAX_DECODE_BUFFER_SIZE=1024*1024;
+	private static final int BUFFER_GROWTH_CHUNK_SIZE=64*1024;
+	private static final char REPLACEMENT_CHARACTER='\uFFFD';
+	private Charset charset=Charset.defaultCharset();
+	private final Object decodeLock=new Object();
+	private CharsetDecoder decoder;
+	private ByteBuffer decodeIn=ByteBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
+	private CharBuffer decodeOut=CharBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
+	private String decodedChunk=null;
+	private boolean decodeFlush=false;
 	private JMenu trunc=new JMenu("Modify Blocking Policies");
 	private JMenuItem distrunc=new JMenuItem("Resume the stream");
 	private JMenuItem redirect=new JMenuItem("Redirect Data you received");
 	private JMenuItem upload=new JMenuItem("Upload");
 	private JMenuItem si=new JMenuItem("Shutdown Input");
 	private JMenuItem sh=new JMenuItem("Hide data you sent");
+	private JMenuItem charSetItem=new JMenuItem("Display Charset");
 	private JMenuItem sendBinary=new JMenuItem("Send Binary Data");
 	private JMenuItem urg=new JMenuItem("Send Urgent Data");
 	private JMenuItem so=new JMenuItem("Shutdown Output");
@@ -95,7 +109,7 @@ public class SocketUI extends JFrame implements Runnable{
 		EDT.put(new OutputEvent(out,block));
 		if(!nSend) {
 			viewHex.insertSend(block);
-			show.append(new String(block));
+			show.append(new String(block,charset));
 		}
 	};
 	private final Consumer<byte[]> SEND_URG=block->{
@@ -109,9 +123,13 @@ public class SocketUI extends JFrame implements Runnable{
 		in.speed=speed;
 	};
 	private final Runnable APPEND_STRING=()->{
-		show.append(Character.toString((char)currentValue));
-		temp[0]=(byte)currentValue;
-		viewHex.insertRecv(temp);
+		if(decodedChunk!=null&&decodedChunk.length()!=0) {
+			show.append(decodedChunk);
+		}
+		if(!decodeFlush) {
+			temp[0]=(byte)currentValue;
+			viewHex.insertRecv(temp);
+		}
 	};
 	private final Runnable DISPLAY_IN_SCREEN=()->{
 		if(nDisplay) {
@@ -164,10 +182,23 @@ public class SocketUI extends JFrame implements Runnable{
 				if(flag) {//when the judger is modified
 					result=currentJudger.test(currentValue);
 				}
+				decodeFlush=false;
+				decodedChunk=appendDecodedText((byte)currentValue,false);
 				DISPLAY_IN_SCREEN.run();
 				TRANSFER_TO_FILE.run();
 				if(currentJudger.aP()&&result) {
 					block();
+				}
+			}
+			if(!nDisplay) {
+				decodeFlush=true;
+				decodedChunk=appendDecodedText((byte)0,true);
+				try {
+					SwingUtilities.invokeAndWait(APPEND_STRING);
+				} catch (InvocationTargetException e) {
+					// Ignore: UI flush is best-effort during shutdown.
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
 				}
 			}
 			EDT.interrupt();
@@ -177,6 +208,69 @@ public class SocketUI extends JFrame implements Runnable{
 			shutdownInput();
 		}
 	}
+	private static CharsetDecoder createDecoder(Charset set) {
+		return set.newDecoder()
+			.onMalformedInput(CodingErrorAction.REPLACE)
+			.onUnmappableCharacter(CodingErrorAction.REPLACE);
+	}
+	/**
+	 * Decode one received byte (or flush at stream end).
+	 *
+	 * @param b received byte value; ignored when {@code end} is {@code true}
+	 * @param end {@code true} to flush decoder state at end-of-stream, otherwise decode {@code b}
+	 * @return decoded text for this step
+	 */
+	private String appendDecodedText(byte b,boolean end) {
+		StringBuilder out=new StringBuilder();
+		synchronized(decodeLock) {
+			if(!end) {
+				if(!decodeIn.hasRemaining()) {
+					if(decodeIn.capacity()>=MAX_DECODE_BUFFER_SIZE) {
+						decoder.reset();
+						decodeIn.clear();
+						return Character.toString(REPLACEMENT_CHARACTER);
+					}
+					int nextCap=nextDecodeBufferCapacity(decodeIn.capacity());
+					if(nextCap>MAX_DECODE_BUFFER_SIZE) {
+						nextCap=MAX_DECODE_BUFFER_SIZE;
+					}
+					ByteBuffer next=ByteBuffer.allocate(nextCap);
+					decodeIn.flip();
+					next.put(decodeIn);
+					decodeIn=next;
+				}
+				decodeIn.put(b);
+			}
+			decodeIn.flip();
+			CoderResult result;
+			do {
+				result=decoder.decode(decodeIn,decodeOut,end);
+				decodeOut.flip();
+				if(decodeOut.hasRemaining()) {
+					out.append(decodeOut);
+				}
+				decodeOut.clear();
+			} while(result.isOverflow());
+			if(end) {
+				do {
+					result=decoder.flush(decodeOut);
+					decodeOut.flip();
+					if(decodeOut.hasRemaining()) {
+						out.append(decodeOut);
+					}
+					decodeOut.clear();
+				} while(result.isOverflow());
+				decoder.reset();
+				decodeIn.clear();
+			}else {
+				decodeIn.compact();
+			}
+		}
+		return out.toString();
+	}
+	private int nextDecodeBufferCapacity(int currentCapacity) {
+		return currentCapacity<BUFFER_GROWTH_CHUNK_SIZE?(currentCapacity<<1):currentCapacity+BUFFER_GROWTH_CHUNK_SIZE;
+	}
 	//GUI
 	public SocketUI(Socket s) {
 		this(s,()->{System.exit(0);});
@@ -185,6 +279,9 @@ public class SocketUI extends JFrame implements Runnable{
 	public SocketUI(Socket soc,Runnable r) {
 		EDT=new EventDispatchThread();
 		EDT.start();
+		synchronized(decodeLock) {
+			decoder=createDecoder(charset);
+		}
 		socket=soc;
 		TITLE=socket.toString();
 		TITLE_BLOCKED="[Input Blocked]"+TITLE;
@@ -452,6 +549,48 @@ public class SocketUI extends JFrame implements Runnable{
 			clear.addActionListener(n->{
 				show.setText("");
 			});
+			//Charset Dialog
+			JDialog setDialog=new JDialog(this,"Display Charset",true);
+			setDialog.setLayout(new BorderLayout());
+			JPanel setNorth=new JPanel(new FlowLayout());
+			setNorth.add(new JLabel("Charset="));
+			JComboBox<Charset> list=new JComboBox<>(Charset.availableCharsets().values().toArray(new Charset[0]));
+			list.setSelectedItem(charset);
+			setNorth.add(list);
+			JPanel setSouth=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+			JButton setOK=new JButton("OK");
+			JButton setCancel=new JButton("Cancel");
+			setOK.addActionListener(n->{
+				synchronized(decodeLock) {
+					String pending=appendDecodedText((byte)0,true);
+					if(pending.length()!=0) {
+						show.append(pending);
+					}
+					Charset set=list.getItemAt(list.getSelectedIndex());
+					if(set==null) {
+						set=Charset.defaultCharset();
+					}
+					charset=set;
+					decoder=createDecoder(charset);
+					decodeIn=ByteBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
+					decodeOut=CharBuffer.allocate(INITIAL_DECODE_BUFFER_SIZE);
+				}
+				setDialog.dispose();
+			});
+			setCancel.addActionListener(n->{
+				setDialog.dispose();
+			});
+			setSouth.add(setOK);
+			setSouth.add(setCancel);
+			setDialog.add(setNorth,BorderLayout.NORTH);
+			setDialog.add(setSouth,BorderLayout.SOUTH);
+			setDialog.pack();
+			setDialog.setMinimumSize(setDialog.getSize());
+			charSetItem.addActionListener(n->{
+				list.setSelectedItem(charset);
+				setDialog.setVisible(true);
+			});
+			//Dialog done
 			distrunc.addActionListener(n->{
 				synchronized(SocketUI.this) {
 					SocketUI.this.notifyAll();
@@ -560,6 +699,7 @@ public class SocketUI extends JFrame implements Runnable{
 			trunc.add(del);
 			data.add(vh);
 			data.add(clear);
+			data.add(charSetItem);
 			data.add(trunc);
 			data.add(distrunc);
 			data.add(sh);
@@ -591,11 +731,12 @@ public class SocketUI extends JFrame implements Runnable{
 			panel.add(scroll1,BorderLayout.SOUTH);
 			send.addActionListener(n->{
 				input.setEditable(false);
+				byte[] outBytes=input.getText().getBytes(charset);
 				if(!nSend) {
 					show.append(input.getText());
-					viewHex.insertSend(input.getText().getBytes());
+					viewHex.insertSend(outBytes);
 				}
-				EDT.put(new OutputEvent(out,input.getText().getBytes()));
+				EDT.put(new OutputEvent(out,outBytes));
 				input.setEditable(true);
 				input.setText("");
 			});
