@@ -4,6 +4,8 @@ import java.awt.event.*;
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;
 import java.net.*;
+import java.nio.*;
+import java.nio.charset.*;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.text.*;
@@ -48,6 +50,9 @@ public class SocketUI extends JFrame implements Runnable{
 	private Delimiter delimiter;
 	private String lastFile="WINE Is Not an Emulator";
 	private OutputStream fOut=OutputStream.nullOutputStream();
+	private final CharsetDecoder decoder=Charset.defaultCharset().newDecoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
+	private ByteBuffer decodeIn=ByteBuffer.allocate(16);
+	private CharBuffer decodeOut=CharBuffer.allocate(16);
 	private JMenu trunc=new JMenu("Modify Blocking Policies");
 	private JMenuItem distrunc=new JMenuItem("Resume the stream");
 	private JMenuItem redirect=new JMenuItem("Redirect Data you received");
@@ -109,9 +114,12 @@ public class SocketUI extends JFrame implements Runnable{
 		in.speed=speed;
 	};
 	private final Runnable APPEND_STRING=()->{
-		show.append(Character.toString((char)currentValue));
+		appendDecodedText((byte)currentValue,false);
 		temp[0]=(byte)currentValue;
 		viewHex.insertRecv(temp);
+	};
+	private final Runnable FLUSH_STRING=()->{
+		appendDecodedText((byte)0,true);
 	};
 	private final Runnable DISPLAY_IN_SCREEN=()->{
 		if(nDisplay) {
@@ -170,11 +178,57 @@ public class SocketUI extends JFrame implements Runnable{
 					block();
 				}
 			}
+			if(!nDisplay) {
+				try {
+					SwingUtilities.invokeAndWait(FLUSH_STRING);
+				} catch (InvocationTargetException | InterruptedException e) {}
+			}
 			EDT.interrupt();
 			shutdownInput();
 		}catch(IOException e) {
 			EDT.interrupt();
 			shutdownInput();
+		}
+	}
+	private void appendDecodedText(byte b,boolean end) {
+		if(!end) {
+			if(!decodeIn.hasRemaining()) {
+				ByteBuffer next=ByteBuffer.allocate(decodeIn.capacity()<<1);
+				decodeIn.flip();
+				next.put(decodeIn);
+				decodeIn=next;
+			}
+			decodeIn.put(b);
+		}
+		decodeIn.flip();
+		while(true) {
+			CoderResult result=decoder.decode(decodeIn,decodeOut,end);
+			decodeOut.flip();
+			if(decodeOut.hasRemaining()) {
+				show.append(decodeOut.toString());
+			}
+			decodeOut.clear();
+			if(result.isOverflow()) {
+				continue;
+			}
+			break;
+		}
+		if(end) {
+			while(true) {
+				CoderResult result=decoder.flush(decodeOut);
+				decodeOut.flip();
+				if(decodeOut.hasRemaining()) {
+					show.append(decodeOut.toString());
+				}
+				decodeOut.clear();
+				if(!result.isOverflow()) {
+					break;
+				}
+			}
+			decoder.reset();
+			decodeIn.clear();
+		}else {
+			decodeIn.compact();
 		}
 	}
 	//GUI
