@@ -245,42 +245,36 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 					selectInterface.add(TTL);
 					JCheckBox loop=new JCheckBox("Loopback");
 					selectInterface.add(loop);
-					selectInterface.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
-					selectInterface.addWindowListener(new WindowListener(){
-						@Override
-						public void windowOpened(WindowEvent e) {}
-						@Override
-						public void windowClosing(WindowEvent e) {
-								try {
-									int i=Integer.parseInt(ttl.getText());
-									if(i>255) {
-										JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
-										return;
-									}
-									multi.setNetworkInterface(iList.get(interfaces.getSelectedIndex()));
-									multi.setTimeToLive(i);
-									multi.setOption(StandardSocketOptions.IP_MULTICAST_LOOP,loop.isSelected());
-								}catch(NumberFormatException nfe) {
-									JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
-									return;
-								} catch (IOException e1) {
-									System.err.println("[WARNING] Bad Options");
-								}
-								selectInterface.dispose();
+					JPanel action=new JPanel(new FlowLayout(FlowLayout.RIGHT));
+					JButton confOK=new JButton("OK");
+					JButton confCancel=new JButton("Cancel");
+					confOK.addActionListener(n->{
+						try {
+							int i=Integer.parseInt(ttl.getText());
+							if(i<0||i>255) {
+								JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+								return;
+							}
+							multi.setNetworkInterface(iList.get(interfaces.getSelectedIndex()));
+							multi.setTimeToLive(i);
+							multi.setOption(StandardSocketOptions.IP_MULTICAST_LOOP,loop.isSelected());
+							selectInterface.dispose();
+						}catch(NumberFormatException nfe) {
+							JOptionPane.showMessageDialog(selectInterface,"TTL\'s range is [0,255]","Illegal Input",JOptionPane.ERROR_MESSAGE);
+						} catch (IOException e1) {
+							System.err.println("[WARNING] Bad Options");
+							selectInterface.dispose();
 						}
-						@Override
-						public void windowClosed(WindowEvent e) {}
-						@Override
-						public void windowIconified(WindowEvent e) {}
-						@Override
-						public void windowDeiconified(WindowEvent e) {}
-						@Override
-						public void windowActivated(WindowEvent e) {}
-						@Override
-						public void windowDeactivated(WindowEvent e) {}			
 					});
+					confCancel.addActionListener(n->{
+						selectInterface.dispose();
+					});
+					action.add(confOK);
+					action.add(confCancel);
+					selectInterface.add(action);
+					selectInterface.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 					selectInterface.pack();
-					selectInterface.setMinimumSize(selectInterface.getSize());
+					selectInterface.setMinimumSize(new Dimension(360,180));
 					//Dialog done
 					inter.addActionListener(n->{
 						selectInterface.setVisible(true);
