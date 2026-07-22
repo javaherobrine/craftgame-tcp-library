@@ -6,8 +6,12 @@ import io.github.javaherobrine.*;
 public abstract class Server<T> implements Closeable, Runnable{
 	private ServerSocket server;
 	private Map<T,ServerSideClient<T>> connected=new HashMap<T,ServerSideClient<T>>();
-	EventDispatchThread EDT=new EventDispatchThread();
+	EventDispatchThread EDT;
 	public Server(int port) throws IOException {
+		this(port, new EventDispatchThread());;
+	}
+	protected Server(int port, EventDispatchThread EDT) throws IOException{
+		this.EDT=EDT;
 		server=new ServerSocket(port);
 		start();
 	}
