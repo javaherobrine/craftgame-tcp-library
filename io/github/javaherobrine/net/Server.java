@@ -3,7 +3,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import io.github.javaherobrine.*;
-public abstract class Server<T> implements Closeable, Runnable{
+public abstract class Server<T> implements AbstractServer, Runnable{
 	private ServerSocket server;
 	private Map<T,ServerSideClient<T>> connected=new HashMap<T,ServerSideClient<T>>();
 	EventDispatchThread EDT;
@@ -45,7 +45,7 @@ public abstract class Server<T> implements Closeable, Runnable{
 	@Override
 	public void close() throws IOException{
 		server.close();
-		EDT.interrupt();
+		EDT.shutdown();
 		synchronized(connected) {
 			connected.values().forEach(n->{
 				try {

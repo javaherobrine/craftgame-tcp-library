@@ -1,6 +1,13 @@
 # CraftGame TCP Library
+
+## Current Tasks
+
+- NIO
+- DTLS
+
 ## craftgame-tcp library is independent after April 18th 2021
-It still synchronizes with repository javaherobrine/CraftGame and it used to be a part of CraftGame
+
+It still synchronizes with repository javaherobrine/CraftGame(Now it's CraftGame-Studio-Dev/JaroSideCraftGame) and it used to be a part of CraftGame
 
 It includes a C/S library and a TCP connection debugger which allows you to send and receive plain text directly. You can use it to send a HTTP request, send an email through a SMTP server, etc.
 

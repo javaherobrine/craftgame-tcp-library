@@ -1,11 +1,18 @@
 package io.github.javaherobrine;
 import java.util.concurrent.*;
-public class EventDispatchThread extends Thread{
+import java.util.concurrent.atomic.*;
+public class EventDispatchThread implements Runnable, AutoCloseable{
+	private Thread EDT;
+	private AtomicBoolean b=new AtomicBoolean(true);
 	private BlockingQueue<AbstractEvent> queue=new LinkedBlockingDeque<>();
+	public EventDispatchThread() {
+		EDT=new Thread(this);
+		EDT.start();
+	}
 	@Override
 	public void run() {
 		try {
-			while(true) {
+			while(b.get()) {
 				AbstractEvent event=queue.take();
 				try {
 					event.process();
@@ -25,5 +32,13 @@ public class EventDispatchThread extends Thread{
 	}
 	public void put(AbstractEvent e) {
 		queue.add(e);
+	}
+	@Override
+	public void close() throws Exception {
+		shutdown();
+	}
+	public void shutdown() {
+		EDT.interrupt();
+		b.set(false);
 	}
 }

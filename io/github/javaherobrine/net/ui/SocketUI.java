@@ -201,10 +201,10 @@ public class SocketUI extends JFrame implements Runnable{
 					Thread.currentThread().interrupt();
 				}
 			}
-			EDT.interrupt();
+			EDT.shutdown();
 			shutdownInput();
 		}catch(IOException e) {
-			EDT.interrupt();
+			EDT.shutdown();
 			shutdownInput();
 		}
 	}
@@ -278,7 +278,6 @@ public class SocketUI extends JFrame implements Runnable{
 	@SuppressWarnings("unused")
 	public SocketUI(Socket soc,Runnable r) {
 		EDT=new EventDispatchThread();
-		EDT.start();
 		synchronized(decodeLock) {
 			decoder=createDecoder(charset);
 		}
@@ -750,7 +749,7 @@ public class SocketUI extends JFrame implements Runnable{
 						fOut.close();
 					} catch (IOException e1) {}
 					dispose();
-					EDT.interrupt();
+					EDT.shutdown();
 				}
 				@Override
 				public void windowClosed(WindowEvent e) {

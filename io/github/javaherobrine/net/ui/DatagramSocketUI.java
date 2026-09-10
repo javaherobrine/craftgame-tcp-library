@@ -99,7 +99,6 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 	@SuppressWarnings("unused")
 	public DatagramSocketUI(DatagramSocket socket,Runnable onClose) {
 		this.run=onClose;
-		EDT.start();
 		this.socket=socket;
 		SwingUtilities.invokeLater(()->{
 			setResizable(false);
@@ -648,7 +647,7 @@ public class DatagramSocketUI extends JFrame implements Runnable{
 		}
 		dataView.dispose();
 		socket.close();
-		EDT.interrupt();
+		EDT.shutdown();
 		run.run();
 	}
 	@Override
